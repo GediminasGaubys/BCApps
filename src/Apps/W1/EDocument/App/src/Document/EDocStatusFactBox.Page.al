@@ -103,7 +103,7 @@ page 6187 "E-Doc. Status FactBox"
         }
     }
 
-    procedure SetDocumentRecordId(RecId: RecordId)
+    internal procedure SetDocumentRecordId(RecId: RecordId)
     begin
         Rec.SetRange("Document Record ID", RecId);
         CurrPage.Update(false);
