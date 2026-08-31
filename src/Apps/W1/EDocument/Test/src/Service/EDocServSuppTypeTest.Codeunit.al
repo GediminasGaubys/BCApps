@@ -8,7 +8,7 @@ using Microsoft.eServices.EDocument;
 using Microsoft.eServices.EDocument.Integration;
 using System.TestLibraries.Utilities;
 
-codeunit 139899 "E-Doc. Serv. Supp. Type Test"
+codeunit 139898 "E-Doc. Serv. Supp. Type Test"
 {
     Subtype = Test;
     TestType = IntegrationTest;
