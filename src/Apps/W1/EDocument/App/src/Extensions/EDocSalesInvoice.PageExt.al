@@ -14,6 +14,21 @@ pageextension 6128 "E-Doc. Sales Invoice" extends "Sales Invoice"
         {
             group("E-Document")
             {
+                action("OpenEDocument")
+                {
+                    ApplicationArea = Basic, Suite;
+                    Caption = 'Open';
+                    Image = Open;
+                    ToolTip = 'Opens the related E-Document card.';
+                    Enabled = EDocumentExists;
+
+                    trigger OnAction()
+                    var
+                        EDocument: Record "E-Document";
+                    begin
+                        EDocument.OpenEDocument(Rec.RecordId());
+                    end;
+                }
                 action("PreviewEDocumentMapping")
                 {
                     ApplicationArea = Basic, Suite;
@@ -32,4 +47,14 @@ pageextension 6128 "E-Doc. Sales Invoice" extends "Sales Invoice"
             }
         }
     }
+
+    var
+        EDocumentExists: Boolean;
+
+    trigger OnAfterGetCurrRecord()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId());
+    end;
 }
