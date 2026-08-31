@@ -1007,6 +1007,20 @@ codeunit 139629 "Library - E-Document"
         if EDocServiceSupportedType.Insert() then;
     end;
 
+    procedure AddEDocServiceSupportedType(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"; Direction: Enum "E-Doc. Supp. Type Direction")
+    var
+        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+    begin
+        if not EDocService.Get(EDocService.Code) then
+            exit;
+
+        EDocServiceSupportedType.Init();
+        EDocServiceSupportedType."E-Document Service Code" := EDocService.Code;
+        EDocServiceSupportedType."Source Document Type" := EDocumentType;
+        EDocServiceSupportedType.Direction := Direction;
+        if EDocServiceSupportedType.Insert(false) then;
+    end;
+
     procedure CreateTestReceiveServiceForEDoc(var EDocService: Record "E-Document Service"; Integration: Enum "Service Integration")
     begin
         if not EDocService.Get('TESTRECEIVE') then begin

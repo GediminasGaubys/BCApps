@@ -270,27 +270,68 @@ codeunit 6165 "EDoc PEPPOL BIS 3.0" implements "E-Document"
 
     [EventSubscriber(ObjectType::Table, Database::"E-Document Service", 'OnAfterValidateEvent', 'Document Format', false, false)]
     local procedure OnAfterValidateDocumentFormat(var Rec: Record "E-Document Service"; var xRec: Record "E-Document Service"; CurrFieldNo: Integer)
+    begin
+        if Rec."Document Format" <> Rec."Document Format"::"PEPPOL BIS 3.0" then
+            exit;
+
+        if not ShouldSeedDefaultSupportedTypes(Rec.Code) then
+            exit;
+
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Invoice");
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Credit Memo");
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Invoice");
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Credit Memo");
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Remittance Advice");
+    end;
+
+    local procedure InsertDefaultSupportedTypeIfMissing(EDocServiceCode: Code[20]; SourceDocumentType: Enum "E-Document Type")
     var
         EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
     begin
-        if Rec."Document Format" = Rec."Document Format"::"PEPPOL BIS 3.0" then begin
-            EDocServiceSupportedType.SetRange("E-Document Service Code", Rec.Code);
-            if EDocServiceSupportedType.IsEmpty() then begin
-                EDocServiceSupportedType.Init();
-                EDocServiceSupportedType."E-Document Service Code" := Rec.Code;
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Sales Invoice";
-                EDocServiceSupportedType.Insert();
+        if EDocServiceSupportedType.Get(EDocServiceCode, SourceDocumentType) then
+            exit;
 
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Sales Credit Memo";
-                EDocServiceSupportedType.Insert();
+        EDocServiceSupportedType.Init();
+        EDocServiceSupportedType."E-Document Service Code" := EDocServiceCode;
+        EDocServiceSupportedType."Source Document Type" := SourceDocumentType;
+        EDocServiceSupportedType.Direction := EDocServiceSupportedType.Direction::Outgoing;
+        EDocServiceSupportedType.Insert();
+    end;
 
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Service Invoice";
-                EDocServiceSupportedType.Insert();
+    local procedure ShouldSeedDefaultSupportedTypes(EDocServiceCode: Code[20]): Boolean
+    var
+        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+    begin
+        EDocServiceSupportedType.SetRange("E-Document Service Code", EDocServiceCode);
+        if EDocServiceSupportedType.IsEmpty() then
+            exit(true);
 
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Service Credit Memo";
-                EDocServiceSupportedType.Insert();
-            end;
-        end;
+        exit(HasDataExchangeDefaultSupportedTypes(EDocServiceCode));
+    end;
+
+    local procedure HasDataExchangeDefaultSupportedTypes(EDocServiceCode: Code[20]): Boolean
+    var
+        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+    begin
+        EDocServiceSupportedType.SetRange("E-Document Service Code", EDocServiceCode);
+        if EDocServiceSupportedType.Count() <> 4 then
+            exit(false);
+
+        exit(
+            HasOutgoingSupportedType(EDocServiceCode, Enum::"E-Document Type"::"Sales Invoice") and
+            HasOutgoingSupportedType(EDocServiceCode, Enum::"E-Document Type"::"Sales Credit Memo") and
+            HasOutgoingSupportedType(EDocServiceCode, Enum::"E-Document Type"::"Service Invoice") and
+            HasOutgoingSupportedType(EDocServiceCode, Enum::"E-Document Type"::"Service Credit Memo"));
+    end;
+
+    local procedure HasOutgoingSupportedType(EDocServiceCode: Code[20]; SourceDocumentType: Enum "E-Document Type"): Boolean
+    var
+        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+    begin
+        if not EDocServiceSupportedType.Get(EDocServiceCode, SourceDocumentType) then
+            exit(false);
+
+        exit(EDocServiceSupportedType.Direction = EDocServiceSupportedType.Direction::Outgoing);
     end;
 
     [IntegrationEvent(false, false)]

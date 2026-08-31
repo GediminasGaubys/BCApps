@@ -572,27 +572,67 @@ codeunit 6102 "E-Doc. Export"
     end;
 
     procedure IsDocumentTypeSupported(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"): Boolean
+    begin
+        exit(IsDocumentTypeSupportedForDirection(EDocService, EDocumentType, Enum::"E-Doc. Supp. Type Direction"::Outgoing, false));
+    end;
+
+    /// <summary>
+    /// Mirrors IsDocumentTypeSupported for the inbound import pipeline: a document type is supported for import
+    /// when its (or its fallback-pair's) configured row allows Incoming or Both.
+    /// </summary>
+    procedure IsDocumentTypeSupportedForImport(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"): Boolean
+    begin
+        exit(IsDocumentTypeSupportedForDirection(EDocService, EDocumentType, Enum::"E-Doc. Supp. Type Direction"::Incoming, true));
+    end;
+
+    local procedure IsDocumentTypeSupportedForDirection(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"; DefaultWhenUnconfigured: Boolean): Boolean
     var
-        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
         EDocSourceType: Enum "E-Document Type";
     begin
         case EDocumentType of
             EDocumentType::"Sales Order":
-                exit(EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Sales Order") or EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Sales Invoice"));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Sales Order", EDocSourceType::"Sales Invoice", QueriedDirection, DefaultWhenUnconfigured));
             EDocumentType::"Sales Return Order":
-                exit(EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Sales Return Order") or EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Sales Credit Memo"));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Sales Return Order", EDocSourceType::"Sales Credit Memo", QueriedDirection, DefaultWhenUnconfigured));
             EDocumentType::"Service Order":
-                exit(EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Service Order") or EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Service Invoice"));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Service Order", EDocSourceType::"Service Invoice", QueriedDirection, DefaultWhenUnconfigured));
             EDocumentType::"Finance Charge Memo":
-                exit(EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Finance Charge Memo") or EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Issued Finance Charge Memo"));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Finance Charge Memo", EDocSourceType::"Issued Finance Charge Memo", QueriedDirection, DefaultWhenUnconfigured));
             EDocumentType::Reminder:
-                exit(EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::Reminder) or EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Issued Reminder"));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::Reminder, EDocSourceType::"Issued Reminder", QueriedDirection, DefaultWhenUnconfigured));
             EDocumentType::"Purchase Order":
-                exit(EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Purchase Order") or EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Purchase Invoice"));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Purchase Order", EDocSourceType::"Purchase Invoice", QueriedDirection, DefaultWhenUnconfigured));
             EDocumentType::"Purchase Return Order":
-                exit(EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Purchase Return Order") or EDocServiceSupportedType.Get(EDocService.Code, EDocSourceType::"Purchase Credit Memo"));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Purchase Return Order", EDocSourceType::"Purchase Credit Memo", QueriedDirection, DefaultWhenUnconfigured));
         end;
-        exit(EDocServiceSupportedType.Get(EDocService.Code, EDocumentType));
+
+        exit(IsFallbackPairSupported(EDocService.Code, EDocumentType, EDocumentType, QueriedDirection, DefaultWhenUnconfigured));
+    end;
+
+    local procedure IsFallbackPairSupported(EDocServiceCode: Code[20]; DocumentType1: Enum "E-Document Type"; DocumentType2: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"; DefaultWhenUnconfigured: Boolean): Boolean
+    var
+        IsConfigured: Boolean;
+        IsSupported: Boolean;
+    begin
+        IsSupported := IsSupportedTypeRow(EDocServiceCode, DocumentType1, QueriedDirection, IsConfigured);
+        if IsConfigured then
+            exit(IsSupported);
+
+        IsSupported := IsSupportedTypeRow(EDocServiceCode, DocumentType2, QueriedDirection, IsConfigured);
+        if IsConfigured then
+            exit(IsSupported);
+
+        exit(DefaultWhenUnconfigured);
+    end;
+
+    local procedure IsSupportedTypeRow(EDocServiceCode: Code[20]; DocumentType: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"; var IsConfigured: Boolean): Boolean
+    var
+        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+    begin
+        IsConfigured := EDocServiceSupportedType.Get(EDocServiceCode, DocumentType);
+        if not IsConfigured then
+            exit(false);
+        exit((EDocServiceSupportedType.Direction = EDocServiceSupportedType.Direction::Both) or (EDocServiceSupportedType.Direction = QueriedDirection));
     end;
 
     local procedure IsDocumentSupported(EDocumentService: Record "E-Document Service"; SourceDocumentHeader: RecordRef; DocumentType: Enum "E-Document Type"): Boolean

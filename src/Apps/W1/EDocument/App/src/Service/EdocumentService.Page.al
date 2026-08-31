@@ -257,8 +257,8 @@ page 6133 "E-Document Service"
             }
             action(SupportedDocTypes)
             {
-                Caption = 'Configure documents to export.';
-                ToolTip = 'Set up what documents framework will export.';
+                Caption = 'Configure supported documents';
+                ToolTip = 'Set up which document types the framework can send or receive for this service.';
                 Image = Documents;
                 RunObject = Page "E-Doc Service Supported Types";
                 RunPageLink = "E-Document Service Code" = field(Code);

@@ -151,11 +151,15 @@ codeunit 6104 "Import E-Document Process"
     var
         Vendor: Record Vendor;
         EDocumentPurchaseHeader: Record "E-Document Purchase Header";
+        EDocExport: Codeunit "E-Doc. Export";
         IProcessStructuredData: Interface IProcessStructuredData;
         VendNo: Code[20];
     begin
         IProcessStructuredData := EDocument."Process Draft Impl.";
         EDocument."Document Type" := IProcessStructuredData.PrepareDraft(EDocument, EDocImportParameters);
+
+        if (EDocument."Document Type" <> "E-Document Type"::None) and not EDocExport.IsDocumentTypeSupportedForImport(EDocument.GetEDocumentService(), EDocument."Document Type") then
+            Error(DocumentTypeNotSupportedForImportErr, EDocument."Document Type", EDocument.GetEDocumentService().Code);
 
         VendNo := IProcessStructuredData.GetVendor(EDocument, EDocImportParameters."Processing Customizations")."No.";
         if VendNo = '' then begin
@@ -390,5 +394,6 @@ codeunit 6104 "Import E-Document Process"
         GlobalStep: Enum "Import E-Document Steps";
         GlobalUndoStep: Boolean;
         NoStructuredDataErr: Label 'No structured data is associated with this E-Document. Verify that the source document is in valid format.';
+        DocumentTypeNotSupportedForImportErr: Label 'Document type %1 is explicitly restricted from the Incoming direction on E-Document Service %2.', Comment = '%1 - E-Document Type, %2 - E-Document Service Code';
         TermsAndConditionsHyperlinkTxt: Label 'https://www.microsoft.com/en-us/business-applications/legal/supp-powerplatform-preview', Locked = true;
 }

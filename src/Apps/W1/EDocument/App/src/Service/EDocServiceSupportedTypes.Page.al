@@ -23,6 +23,11 @@ page 6129 "E-Doc Service Supported Types"
                     ApplicationArea = All;
                     ToolTip = 'Specifies the supported source document type.';
                 }
+                field(Direction; Rec.Direction)
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Specifies whether this document type is permitted for outgoing (export), incoming (import), or both directions on this service.';
+                }
             }
         }
     }

@@ -26,6 +26,7 @@ codeunit 6168 "E-Document Upgrade"
 #endif
         UpgradeDataExchV2Defs();
         UpgradeEnableVATOptionsForPurchEDoc();
+        UpgradeSupportedTypeDirection();
     end;
 
     local procedure UpgradeLogURLMaxLength()
@@ -66,6 +67,7 @@ codeunit 6168 "E-Document Upgrade"
         PerCompanyUpgradeTags.Add(GetUpgradeProcessDraftEnumTag());
         PerCompanyUpgradeTags.Add(GetUpgradeDataExchV2DefsTag());
         PerCompanyUpgradeTags.Add(GetEnableVATOptionsForPurchEDocTag());
+        PerCompanyUpgradeTags.Add(GetUpgradeSupportedTypeDirectionTag());
     end;
 
     internal procedure GetUpgradeLogURLMaxLengthUpgradeTag(): Code[250]
@@ -121,4 +123,22 @@ codeunit 6168 "E-Document Upgrade"
         exit('MS-EDoc-EnableVATOptionsForPurchEDoc-20260520');
     end;
 
+    local procedure UpgradeSupportedTypeDirection()
+    var
+        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+        UpgradeTag: Codeunit "Upgrade Tag";
+    begin
+        if UpgradeTag.HasUpgradeTag(GetUpgradeSupportedTypeDirectionTag()) then
+            exit;
+
+        if not EDocServiceSupportedType.IsEmpty() then
+            EDocServiceSupportedType.ModifyAll(Direction, EDocServiceSupportedType.Direction::Both);
+
+        UpgradeTag.SetUpgradeTag(GetUpgradeSupportedTypeDirectionTag());
+    end;
+
+    internal procedure GetUpgradeSupportedTypeDirectionTag(): Code[250]
+    begin
+        exit('MS-EDoc-SupportedTypeDirection-20260824');
+    end;
 }
