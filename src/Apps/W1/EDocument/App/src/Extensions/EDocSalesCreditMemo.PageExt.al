@@ -53,14 +53,8 @@ pageextension 6133 "E-Doc. Sales Credit Memo" extends "Sales Credit Memo"
     }
 
     trigger OnAfterGetCurrRecord()
-    var
-        EDocument: Record "E-Document";
     begin
-        EDocument.SetRange("Document Record ID", Rec.RecordId());
-        if EDocument.FindLast() then
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(EDocument."Entry No")
-        else
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(-1);
+        CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;
 }

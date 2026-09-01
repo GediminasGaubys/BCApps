@@ -129,7 +129,6 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
     trigger OnAfterGetCurrRecord()
     var
         EDocument: Record "E-Document";
-        OutboundEDocument: Record "E-Document";
         EDocumentServiceStatus: Record "E-Document Service Status";
     begin
         ShowMapToEDocument := false;
@@ -140,13 +139,7 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
             ShowMapToEDocument := EDocumentServiceStatus.Status = Enum::"E-Document Service Status"::"Order Linked";
         end;
 
-        OutboundEDocument.SetRange("Document Record ID", Rec.RecordId());
-        OutboundEDocument.SetRange(Direction, OutboundEDocument.Direction::Outgoing);
-        if OutboundEDocument.FindLast() then
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(OutboundEDocument."Entry No")
-        else
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(-1);
+        CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;
-
 }

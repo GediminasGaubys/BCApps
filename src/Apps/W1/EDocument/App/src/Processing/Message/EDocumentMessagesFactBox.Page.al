@@ -4,6 +4,7 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.eServices.EDocument.Processing.Message;
 
+using Microsoft.eServices.EDocument;
 using System.Utilities;
 
 /// <summary>
@@ -90,12 +91,24 @@ page 6434 "E-Document Messages FactBox"
     var
         FileNameTok: Label 'E-Document_%1_Response_%2.xml', Comment = '%1 = E-Document number, %2 = human-readable response type', Locked = true;
 
-    internal procedure SetEDocumentFilter(EDocumentEntryNo: Integer)
+    internal procedure SetSourceRecordId(SourceRecordId: RecordId)
+    var
+        EDocument: Record "E-Document";
+        FilterTxt: TextBuilder;
     begin
-        if EDocumentEntryNo <= 0 then
-            Rec.SetRange("E-Document Entry No.", -1)  // impossible value — hides all rows
+        EDocument.SetRange("Document Record ID", SourceRecordId);
+        if EDocument.FindSet() then
+            repeat
+                if FilterTxt.Length() > 0 then
+                    FilterTxt.Append('|');
+                FilterTxt.Append(Format(EDocument."Entry No"));
+            until EDocument.Next() = 0;
+
+        if FilterTxt.Length() > 0 then
+            Rec.SetFilter("E-Document Entry No.", FilterTxt.ToText())
         else
-            Rec.SetRange("E-Document Entry No.", EDocumentEntryNo);
+            // No e-documents bound to the source record: filter to a value that cannot exist so the FactBox stays empty.
+            Rec.SetRange("E-Document Entry No.", -1);
         CurrPage.Update(false);
     end;
 

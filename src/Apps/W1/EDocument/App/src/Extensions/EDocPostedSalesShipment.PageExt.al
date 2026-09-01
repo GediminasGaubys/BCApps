@@ -39,6 +39,7 @@ pageextension 6103 "E-Doc. Posted Sales Shipment" extends "Posted Sales Shipment
                     Caption = 'Open';
                     Image = Open;
                     ToolTip = 'Opens the E-Document card page.';
+                    Enabled = EDocumentExists;
 
                     trigger OnAction()
                     var
@@ -78,12 +79,8 @@ pageextension 6103 "E-Doc. Posted Sales Shipment" extends "Posted Sales Shipment
     var
         EDocument: Record "E-Document";
     begin
-        EDocument.SetRange("Document Record ID", Rec.RecordId());
-        EDocumentExists := EDocument.FindLast();
-        if EDocumentExists then
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(EDocument."Entry No")
-        else
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(-1);
+        EDocumentExists := EDocument.IsEDocumentCreatedForRecord(Rec);
+        CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;
 }

@@ -39,6 +39,7 @@ pageextension 6147 "E-Doc. Posted Purch. Cr. Memo" extends "Posted Purchase Cred
                     Caption = 'Open';
                     Image = Open;
                     ToolTip = 'Opens the E-Document card page.';
+                    Enabled = EDocumentExists;
 
                     trigger OnAction()
                     var
@@ -51,15 +52,15 @@ pageextension 6147 "E-Doc. Posted Purch. Cr. Memo" extends "Posted Purchase Cred
         }
     }
 
+    var
+        EDocumentExists: Boolean;
+
     trigger OnAfterGetCurrRecord()
     var
         EDocument: Record "E-Document";
     begin
-        EDocument.SetRange("Document Record ID", Rec.RecordId());
-        if EDocument.FindLast() then
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(EDocument."Entry No")
-        else
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(-1);
+        EDocumentExists := EDocument.IsEDocumentCreatedForRecord(Rec);
+        CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;
 }

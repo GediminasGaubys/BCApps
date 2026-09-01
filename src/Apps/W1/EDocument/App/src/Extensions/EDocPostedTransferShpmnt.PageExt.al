@@ -81,12 +81,8 @@ pageextension 6106 "E-Doc. Posted Transfer Shpmnt." extends "Posted Transfer Shi
     var
         EDocument: Record "E-Document";
     begin
-        EDocument.SetRange("Document Record ID", Rec.RecordId());
-        EDocumentExists := EDocument.FindLast();
-        if EDocumentExists then
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(EDocument."Entry No")
-        else
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(-1);
+        EDocumentExists := EDocument.IsEDocumentCreatedForRecord(Rec);
+        CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;
 

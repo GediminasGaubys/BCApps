@@ -117,7 +117,6 @@ pageextension 6129 "E-Doc. Purchase Invoice" extends "Purchase Invoice"
 
     trigger OnAfterGetCurrRecord()
     var
-        EDocument: Record "E-Document";
         EDocumentHelper: Codeunit "E-Document Helper";
         EDocDataStorageEntryNo: Integer;
     begin
@@ -125,11 +124,7 @@ pageextension 6129 "E-Doc. Purchase Invoice" extends "Purchase Invoice"
         EDocDataStorageEntryNo := EDocumentHelper.GetInboundPdfPreviewEntryNo(Rec.RecordId(), Rec."E-Document Link");
         ShowEDocumentPdfPreview := EDocDataStorageEntryNo <> 0;
         CurrPage.EDocumentPdfPreview.Page.SetRecFilterByEDocDataStorageEntryNo(EDocDataStorageEntryNo);
-        EDocument.SetRange("Document Record ID", Rec.RecordId());
-        if EDocument.FindLast() then
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(EDocument."Entry No")
-        else
-            CurrPage.EDocMessages.Page.SetEDocumentFilter(-1);
+        CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;
 }
