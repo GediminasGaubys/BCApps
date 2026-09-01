@@ -515,11 +515,24 @@ table 6121 "E-Document"
     var
         EDocument: Record "E-Document";
         EDocumentPage: Page "E-Document";
+        EDocumentsPage: Page "E-Documents";
     begin
         EDocument.SetRange("Document Record ID", EDocumentRecordId);
-        EDocument.FindFirst();
-        EDocumentPage.SetTableView(EDocument);
-        EDocumentPage.RunModal();
+        // A source record may relate to several e-documents (resend, correction, cancel-and-recreate).
+        case EDocument.Count() of
+            0:
+                exit;
+            1:
+                begin
+                    EDocument.FindFirst();
+                    EDocumentPage.SetTableView(EDocument);
+                    EDocumentPage.RunModal();
+                end;
+            else begin
+                EDocumentsPage.SetTableView(EDocument);
+                EDocumentsPage.RunModal();
+            end;
+        end;
     end;
 
     internal procedure ShowRecord()
