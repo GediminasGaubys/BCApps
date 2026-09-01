@@ -46,6 +46,30 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
         {
             group("E-Document")
             {
+                action("OpenEDocument")
+                {
+                    ApplicationArea = Basic, Suite;
+                    Caption = 'Open';
+                    Image = Open;
+                    ToolTip = 'Opens the related E-Document card.';
+                    Enabled = EDocumentExists;
+
+                    trigger OnAction()
+                    var
+                        EDocument: Record "E-Document";
+                        EDocumentPage: Page "E-Document";
+                    begin
+                        if EDocument.HasEDocument(Rec.RecordId()) then begin
+                            EDocument.OpenEDocument(Rec.RecordId());
+                            exit;
+                        end;
+                        if not IsNullGuid(Rec."E-Document Link") then
+                            if EDocument.GetBySystemId(Rec."E-Document Link") then begin
+                                EDocumentPage.SetRecord(EDocument);
+                                EDocumentPage.RunModal();
+                            end;
+                    end;
+                }
                 action(MatchToOrder)
                 {
                     Caption = 'Map E-Document Lines';
@@ -125,6 +149,7 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
 
     var
         ShowMapToEDocument: Boolean;
+        EDocumentExists: Boolean;
 
     trigger OnAfterGetCurrRecord()
     var
@@ -132,6 +157,7 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
         EDocumentServiceStatus: Record "E-Document Service Status";
     begin
         ShowMapToEDocument := false;
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId()) or (not IsNullGuid(Rec."E-Document Link"));
         if not IsNullGuid(Rec."E-Document Link") then begin
             EDocument.GetBySystemId(Rec."E-Document Link");
             EDocumentServiceStatus.SetRange("E-Document Entry No", EDocument."Entry No");

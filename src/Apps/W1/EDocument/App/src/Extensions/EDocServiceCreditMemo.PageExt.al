@@ -33,6 +33,21 @@ pageextension 6135 "E-Doc. Service Credit Memo" extends "Service Credit Memo"
         {
             group("E-Document")
             {
+                action("OpenEDocument")
+                {
+                    ApplicationArea = Basic, Suite;
+                    Caption = 'Open';
+                    Image = Open;
+                    ToolTip = 'Opens the related E-Document card.';
+                    Enabled = EDocumentExists;
+
+                    trigger OnAction()
+                    var
+                        EDocument: Record "E-Document";
+                    begin
+                        EDocument.OpenEDocument(Rec.RecordId());
+                    end;
+                }
                 action("PreviewEDocumentMapping")
                 {
                     ApplicationArea = Basic, Suite;
@@ -52,8 +67,14 @@ pageextension 6135 "E-Doc. Service Credit Memo" extends "Service Credit Memo"
         }
     }
 
+    var
+        EDocumentExists: Boolean;
+
     trigger OnAfterGetCurrRecord()
+    var
+        EDocument: Record "E-Document";
     begin
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId());
         CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;

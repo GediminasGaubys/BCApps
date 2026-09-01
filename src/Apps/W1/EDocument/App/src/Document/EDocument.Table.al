@@ -535,6 +535,53 @@ table 6121 "E-Document"
         end;
     end;
 
+    internal procedure HasEDocument(EDocumentRecordId: RecordId): Boolean
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocument.SetRange("Document Record ID", EDocumentRecordId);
+        exit(not EDocument.IsEmpty());
+    end;
+
+    internal procedure HasEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Boolean
+    var
+        EDocument: Record "E-Document";
+    begin
+        if DocumentNo = '' then
+            exit(false);
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        exit(not EDocument.IsEmpty());
+    end;
+
+    internal procedure TryOpenEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Boolean
+    var
+        EDocument: Record "E-Document";
+        EDocumentPage: Page "E-Document";
+        NoEDocumentForRecordMsg: Label 'No electronic document is linked to this record.';
+    begin
+        if DocumentNo = '' then begin
+            Message(NoEDocumentForRecordMsg);
+            exit(false);
+        end;
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        if EDocument.IsEmpty() then begin
+            Message(NoEDocumentForRecordMsg);
+            exit(false);
+        end;
+        EDocumentPage.SetTableView(EDocument);
+        EDocumentPage.RunModal();
+        exit(true);
+    end;
+
+    local procedure SetDocumentIdentityFilters(var EDocument: Record "E-Document"; DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    begin
+        EDocument.SetRange("Document No.", DocumentNo);
+        if PostingDate <> 0D then
+            EDocument.SetRange("Posting Date", PostingDate);
+        if PartnerNo <> '' then
+            EDocument.SetRange("Bill-to/Pay-to No.", PartnerNo);
+    end;
+
     internal procedure ShowRecord()
     var
         PageManagement: Codeunit "Page Management";
