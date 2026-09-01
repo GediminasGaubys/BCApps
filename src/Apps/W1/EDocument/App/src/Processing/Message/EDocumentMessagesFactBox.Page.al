@@ -96,6 +96,7 @@ page 6434 "E-Document Messages FactBox"
         EDocument: Record "E-Document";
         FilterTxt: TextBuilder;
     begin
+        EDocument.SetLoadFields("Entry No");
         EDocument.SetRange("Document Record ID", SourceRecordId);
         if EDocument.FindSet() then
             repeat
