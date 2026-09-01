@@ -10,7 +10,7 @@ using Microsoft.Purchases.Document;
 using Microsoft.Purchases.Setup;
 using Microsoft.Purchases.Vendor;
 
-codeunit 139929 "E-Doc. Status FactBox Tests"
+codeunit 139892 "E-Doc. Status FactBox Tests"
 {
     Subtype = Test;
     TestPermissions = Disabled;
