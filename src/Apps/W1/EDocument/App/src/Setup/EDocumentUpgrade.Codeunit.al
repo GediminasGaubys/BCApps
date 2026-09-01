@@ -123,16 +123,31 @@ codeunit 6168 "E-Document Upgrade"
         exit('MS-EDoc-EnableVATOptionsForPurchEDoc-20260520');
     end;
 
-    local procedure UpgradeSupportedTypeDirection()
+    internal procedure UpgradeSupportedTypeDirection()
     var
         EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+        EDocumentService: Record "E-Document Service";
         UpgradeTag: Codeunit "Upgrade Tag";
+        EDocumentType: Enum "E-Document Type";
     begin
         if UpgradeTag.HasUpgradeTag(GetUpgradeSupportedTypeDirectionTag()) then
             exit;
 
         if not EDocServiceSupportedType.IsEmpty() then
             EDocServiceSupportedType.ModifyAll(Direction, EDocServiceSupportedType.Direction::Both);
+
+        if EDocumentService.FindSet() then
+            repeat
+                foreach EDocumentType in EDocumentType.Ordinals() do
+                    if EDocumentType <> EDocumentType::None then
+                        if not EDocServiceSupportedType.Get(EDocumentService.Code, EDocumentType) then begin
+                            EDocServiceSupportedType.Init();
+                            EDocServiceSupportedType."E-Document Service Code" := EDocumentService.Code;
+                            EDocServiceSupportedType."Source Document Type" := EDocumentType;
+                            EDocServiceSupportedType.Direction := EDocServiceSupportedType.Direction::Incoming;
+                            EDocServiceSupportedType.Insert(false);
+                        end;
+            until EDocumentService.Next() = 0;
 
         UpgradeTag.SetUpgradeTag(GetUpgradeSupportedTypeDirectionTag());
     end;

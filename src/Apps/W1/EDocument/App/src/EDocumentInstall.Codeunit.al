@@ -4,6 +4,7 @@
 // ------------------------------------------------------------------------------------------------
 namespace Microsoft.eServices.EDocument.IO;
 
+using Microsoft.eServices.EDocument;
 #if not CLEAN29
 using Microsoft.eServices.EDocument.OrderMatch.Copilot;
 #endif
@@ -18,9 +19,14 @@ codeunit 6161 "E-Document Install"
     Subtype = Install;
 
     trigger OnInstallAppPerCompany()
+    var
+        EDocumentUpgrade: Codeunit "E-Document Upgrade";
+        UpgradeTag: Codeunit "Upgrade Tag";
     begin
         InsertDataExch();
         InsertDataExchV2();
+        if not UpgradeTag.HasUpgradeTag(EDocumentUpgrade.GetUpgradeSupportedTypeDirectionTag()) then
+            UpgradeTag.SetUpgradeTag(EDocumentUpgrade.GetUpgradeSupportedTypeDirectionTag());
     end;
 
 #if not CLEAN29

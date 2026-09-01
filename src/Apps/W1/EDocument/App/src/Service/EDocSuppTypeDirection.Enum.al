@@ -11,7 +11,7 @@ namespace Microsoft.eServices.EDocument;
 enum 6115 "E-Doc. Supp. Type Direction"
 {
     Caption = 'E-Doc. Service Supported Type Direction';
-    Extensible = true;
+    Extensible = false;
 
     value(0; Both)
     {

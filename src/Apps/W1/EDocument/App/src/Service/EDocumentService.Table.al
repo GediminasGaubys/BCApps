@@ -322,11 +322,6 @@ table 6103 "E-Document Service"
         }
     }
 
-    trigger OnInsert()
-    begin
-        Validate("Document Format");
-    end;
-
     trigger OnDelete()
     var
         EDocServiceSupportedType: Record "E-Doc. Service Supported Type";

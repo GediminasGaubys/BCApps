@@ -23,6 +23,7 @@ table 6122 "E-Doc. Service Supported Type"
         field(3; Direction; Enum "E-Doc. Supp. Type Direction")
         {
             Caption = 'Direction';
+            DataClassification = SystemMetadata;
         }
     }
 

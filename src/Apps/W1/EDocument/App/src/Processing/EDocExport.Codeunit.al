@@ -225,6 +225,21 @@ codeunit 6102 "E-Doc. Export"
         EDocServiceStatus: Enum "E-Document Service Status";
         ErrorCount: Integer;
     begin
+        if not IsDocumentTypeSupported(EDocumentService, EDocument."Document Type") then begin
+            EDocumentErrorHelper.LogSimpleErrorMessage(EDocument, StrSubstNo(DocumentTypeNotSupportedForExportErr, EDocument."Document Type", EDocumentService.Code));
+            EDocServiceStatus := Enum::"E-Document Service Status"::"Export Error";
+            EDocumentLog.InsertLog(EDocument, EDocumentService, EDocServiceStatus);
+            EDocumentServiceStatus.ReadIsolation(IsolationLevel::ReadUncommitted);
+            EDocumentServiceStatus.SetRange("E-Document Entry No", EDocument."Entry No");
+            EDocumentServiceStatus.SetRange("E-Document Service Code", EDocumentService.Code);
+            if EDocumentServiceStatus.IsEmpty() then
+                EDocumentProcessing.InsertServiceStatus(EDocument, EDocumentService, EDocServiceStatus)
+            else
+                EDocumentProcessing.ModifyServiceStatus(EDocument, EDocumentService, EDocServiceStatus);
+            EDocumentProcessing.ModifyEDocumentStatus(EDocument);
+            exit(false);
+        end;
+
         SourceDocumentHeader.Get(EDocument."Document Record ID");
         EDocumentProcessing.GetLines(EDocument, SourceDocumentLines);
         MapEDocument(SourceDocumentHeader, SourceDocumentLines, EDocumentService, SourceDocumentHeaderMapped, SourceDocumentLineMapped, TempEDocMapping, false);
@@ -256,8 +271,21 @@ codeunit 6102 "E-Doc. Export"
         TempEDocMapping: Record "E-Doc. Mapping" temporary;
         SourceDocumentHeaderMapped, SourceDocumentLineMapped : RecordRef;
         SourceDocumentHeader, SourceDocumentLines : RecordRef;
+        HasUnsupportedDocumentType: Boolean;
         I: Integer;
     begin
+        EDocuments.FindSet();
+        repeat
+            EDocumentsErrorCount.Add(EDocuments."Entry No", EDocumentErrorHelper.ErrorMessageCount(EDocuments));
+            if not IsDocumentTypeSupported(EDocService, EDocuments."Document Type") then begin
+                EDocumentErrorHelper.LogSimpleErrorMessage(EDocuments, StrSubstNo(DocumentTypeNotSupportedForExportErr, EDocuments."Document Type", EDocService.Code));
+                HasUnsupportedDocumentType := true;
+            end;
+        until EDocuments.Next() = 0;
+
+        if HasUnsupportedDocumentType then
+            exit;
+
         EDocuments.FindSet();
         I := 0;
         repeat
@@ -573,43 +601,51 @@ codeunit 6102 "E-Doc. Export"
 
     procedure IsDocumentTypeSupported(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"): Boolean
     begin
-        exit(IsDocumentTypeSupportedForDirection(EDocService, EDocumentType, Enum::"E-Doc. Supp. Type Direction"::Outgoing, false));
+        exit(IsDocumentTypeSupportedForDirection(EDocService, EDocumentType, Enum::"E-Doc. Supp. Type Direction"::Outgoing));
     end;
 
     /// <summary>
-    /// Mirrors IsDocumentTypeSupported for the inbound import pipeline: a document type is supported for import
-    /// when its (or its fallback-pair's) configured row allows Incoming or Both.
+    /// Determines whether a document type is configured for inbound processing on the E-Document Service.
+    /// The exact document-type row takes precedence over its fallback row. The matched row must allow
+    /// Incoming or Both; if neither row is configured, the document type is not supported.
     /// </summary>
     procedure IsDocumentTypeSupportedForImport(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"): Boolean
     begin
-        exit(IsDocumentTypeSupportedForDirection(EDocService, EDocumentType, Enum::"E-Doc. Supp. Type Direction"::Incoming, true));
+        exit(IsDocumentTypeSupportedForDirection(EDocService, EDocumentType, Enum::"E-Doc. Supp. Type Direction"::Incoming));
     end;
 
-    local procedure IsDocumentTypeSupportedForDirection(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"; DefaultWhenUnconfigured: Boolean): Boolean
+    local procedure IsDocumentTypeSupportedForDirection(EDocService: Record "E-Document Service"; EDocumentType: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"): Boolean
     var
         EDocSourceType: Enum "E-Document Type";
     begin
         case EDocumentType of
             EDocumentType::"Sales Order":
-                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Sales Order", EDocSourceType::"Sales Invoice", QueriedDirection, DefaultWhenUnconfigured));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Sales Order", EDocSourceType::"Sales Invoice", QueriedDirection));
             EDocumentType::"Sales Return Order":
-                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Sales Return Order", EDocSourceType::"Sales Credit Memo", QueriedDirection, DefaultWhenUnconfigured));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Sales Return Order", EDocSourceType::"Sales Credit Memo", QueriedDirection));
             EDocumentType::"Service Order":
-                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Service Order", EDocSourceType::"Service Invoice", QueriedDirection, DefaultWhenUnconfigured));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Service Order", EDocSourceType::"Service Invoice", QueriedDirection));
             EDocumentType::"Finance Charge Memo":
-                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Finance Charge Memo", EDocSourceType::"Issued Finance Charge Memo", QueriedDirection, DefaultWhenUnconfigured));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Finance Charge Memo", EDocSourceType::"Issued Finance Charge Memo", QueriedDirection));
             EDocumentType::Reminder:
-                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::Reminder, EDocSourceType::"Issued Reminder", QueriedDirection, DefaultWhenUnconfigured));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::Reminder, EDocSourceType::"Issued Reminder", QueriedDirection));
             EDocumentType::"Purchase Order":
-                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Purchase Order", EDocSourceType::"Purchase Invoice", QueriedDirection, DefaultWhenUnconfigured));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Purchase Order", EDocSourceType::"Purchase Invoice", QueriedDirection));
             EDocumentType::"Purchase Return Order":
-                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Purchase Return Order", EDocSourceType::"Purchase Credit Memo", QueriedDirection, DefaultWhenUnconfigured));
+                exit(IsFallbackPairSupported(EDocService.Code, EDocSourceType::"Purchase Return Order", EDocSourceType::"Purchase Credit Memo", QueriedDirection));
         end;
 
-        exit(IsFallbackPairSupported(EDocService.Code, EDocumentType, EDocumentType, QueriedDirection, DefaultWhenUnconfigured));
+        exit(IsSingleTypeSupported(EDocService.Code, EDocumentType, QueriedDirection));
     end;
 
-    local procedure IsFallbackPairSupported(EDocServiceCode: Code[20]; DocumentType1: Enum "E-Document Type"; DocumentType2: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"; DefaultWhenUnconfigured: Boolean): Boolean
+    local procedure IsSingleTypeSupported(EDocServiceCode: Code[20]; DocumentType: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"): Boolean
+    var
+        IsConfigured: Boolean;
+    begin
+        exit(IsSupportedTypeRow(EDocServiceCode, DocumentType, QueriedDirection, IsConfigured));
+    end;
+
+    local procedure IsFallbackPairSupported(EDocServiceCode: Code[20]; DocumentType1: Enum "E-Document Type"; DocumentType2: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"): Boolean
     var
         IsConfigured: Boolean;
         IsSupported: Boolean;
@@ -622,7 +658,7 @@ codeunit 6102 "E-Doc. Export"
         if IsConfigured then
             exit(IsSupported);
 
-        exit(DefaultWhenUnconfigured);
+        exit(false);
     end;
 
     local procedure IsSupportedTypeRow(EDocServiceCode: Code[20]; DocumentType: Enum "E-Document Type"; QueriedDirection: Enum "E-Doc. Supp. Type Direction"; var IsConfigured: Boolean): Boolean
@@ -651,6 +687,7 @@ codeunit 6102 "E-Doc. Export"
         EDocumentErrorHelper: Codeunit "E-Document Error Helper";
         Telemetry: Codeunit Telemetry;
         EDocumentInterface: Interface "E-Document";
+        DocumentTypeNotSupportedForExportErr: Label 'Document type %1 is explicitly restricted from the Outgoing direction on E-Document Service %2.', Comment = '%1 - E-Document Type, %2 - E-Document Service Code';
         DocumentSendingProfileWithWorkflowErr: Label 'Workflow %1 defined for %2 in Document Sending Profile %3 is not found.', Comment = '%1 - The workflow code, %2 - Enum value set in Electronic Document, %3 - Document Sending Profile Code';
         EDocTelemetryCreateScopeStartLbl: Label 'E-Document Create: Start Scope', Locked = true;
         EDocTelemetryCreateScopeEndLbl: Label 'E-Document Create: End Scope', Locked = true;
