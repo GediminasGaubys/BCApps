@@ -543,6 +543,33 @@ table 6121 "E-Document"
         exit(not EDocument.IsEmpty());
     end;
 
+    internal procedure GetLatestStatus(SourceRecordId: RecordId): Text
+    var
+        EDocument: Record "E-Document";
+    begin
+        if SourceRecordId.TableNo = 0 then
+            exit('');
+        EDocument.SetRange("Document Record ID", SourceRecordId);
+        EDocument.SetLoadFields(Status);
+        if EDocument.FindLast() then
+            exit(Format(EDocument.Status));
+        exit('');
+    end;
+
+    // Overload for pages whose rows are not the source document itself (e.g. ledger entries, payment registration).
+    internal procedure GetLatestStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Text
+    var
+        EDocument: Record "E-Document";
+    begin
+        if DocumentNo = '' then
+            exit('');
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        EDocument.SetLoadFields(Status);
+        if EDocument.FindLast() then
+            exit(Format(EDocument.Status));
+        exit('');
+    end;
+
     internal procedure HasEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Boolean
     var
         EDocument: Record "E-Document";
@@ -557,6 +584,7 @@ table 6121 "E-Document"
     var
         EDocument: Record "E-Document";
         EDocumentPage: Page "E-Document";
+        EDocumentsPage: Page "E-Documents";
         NoEDocumentForRecordMsg: Label 'No electronic document is linked to this record.';
     begin
         if DocumentNo = '' then begin
@@ -564,12 +592,23 @@ table 6121 "E-Document"
             exit(false);
         end;
         this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
-        if EDocument.IsEmpty() then begin
-            Message(NoEDocumentForRecordMsg);
-            exit(false);
+        case EDocument.Count() of
+            0:
+                begin
+                    Message(NoEDocumentForRecordMsg);
+                    exit(false);
+                end;
+            1:
+                begin
+                    EDocument.FindFirst();
+                    EDocumentPage.SetTableView(EDocument);
+                    EDocumentPage.RunModal();
+                end;
+            else begin
+                EDocumentsPage.SetTableView(EDocument);
+                EDocumentsPage.RunModal();
+            end;
         end;
-        EDocumentPage.SetTableView(EDocument);
-        EDocumentPage.RunModal();
         exit(true);
     end;
 

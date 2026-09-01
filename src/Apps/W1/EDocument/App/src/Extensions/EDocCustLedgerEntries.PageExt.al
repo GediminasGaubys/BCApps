@@ -8,6 +8,20 @@ using Microsoft.eServices.EDocument;
 
 pageextension 6111 "E-Doc. Cust. Ledger Entries" extends "Customer Ledger Entries"
 {
+    layout
+    {
+        addlast(Control1)
+        {
+            field(EDocumentStatus; EDocumentStatusText)
+            {
+                ApplicationArea = Basic, Suite;
+                Caption = 'E-Document Status';
+                ToolTip = 'Specifies the status of the latest electronic document linked to this record. Hidden by default; add it via Personalize to make it visible.';
+                Visible = false;
+                Editable = false;
+            }
+        }
+    }
     actions
     {
         addafter("&Navigate")
@@ -35,4 +49,14 @@ pageextension 6111 "E-Doc. Cust. Ledger Entries" extends "Customer Ledger Entrie
             }
         }
     }
+
+    trigger OnAfterGetRecord()
+    var
+        EDocumentLookup: Record "E-Document";
+    begin
+        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", Rec."Posting Date", Rec."Customer No.");
+    end;
+
+    var
+        EDocumentStatusText: Text;
 }
