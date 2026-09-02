@@ -226,17 +226,7 @@ codeunit 6102 "E-Doc. Export"
         ErrorCount: Integer;
     begin
         if not IsDocumentTypeSupported(EDocumentService, EDocument."Document Type") then begin
-            EDocumentErrorHelper.LogSimpleErrorMessage(EDocument, StrSubstNo(DocumentTypeNotSupportedForExportErr, EDocument."Document Type", EDocumentService.Code));
-            EDocServiceStatus := Enum::"E-Document Service Status"::"Export Error";
-            EDocumentLog.InsertLog(EDocument, EDocumentService, EDocServiceStatus);
-            EDocumentServiceStatus.ReadIsolation(IsolationLevel::ReadUncommitted);
-            EDocumentServiceStatus.SetRange("E-Document Entry No", EDocument."Entry No");
-            EDocumentServiceStatus.SetRange("E-Document Service Code", EDocumentService.Code);
-            if EDocumentServiceStatus.IsEmpty() then
-                EDocumentProcessing.InsertServiceStatus(EDocument, EDocumentService, EDocServiceStatus)
-            else
-                EDocumentProcessing.ModifyServiceStatus(EDocument, EDocumentService, EDocServiceStatus);
-            EDocumentProcessing.ModifyEDocumentStatus(EDocument);
+            LogDocumentTypeNotSupportedForExport(EDocument, EDocumentService);
             exit(false);
         end;
 
@@ -271,19 +261,21 @@ codeunit 6102 "E-Doc. Export"
         TempEDocMapping: Record "E-Doc. Mapping" temporary;
         SourceDocumentHeaderMapped, SourceDocumentLineMapped : RecordRef;
         SourceDocumentHeader, SourceDocumentLines : RecordRef;
-        HasUnsupportedDocumentType: Boolean;
+        HasSupportedDocument: Boolean;
         I: Integer;
     begin
         EDocuments.FindSet();
         repeat
             EDocumentsErrorCount.Add(EDocuments."Entry No", EDocumentErrorHelper.ErrorMessageCount(EDocuments));
-            if not IsDocumentTypeSupported(EDocService, EDocuments."Document Type") then begin
-                EDocumentErrorHelper.LogSimpleErrorMessage(EDocuments, StrSubstNo(DocumentTypeNotSupportedForExportErr, EDocuments."Document Type", EDocService.Code));
-                HasUnsupportedDocumentType := true;
-            end;
+            if IsDocumentTypeSupported(EDocService, EDocuments."Document Type") then begin
+                EDocuments.Mark(true);
+                HasSupportedDocument := true;
+            end else
+                LogDocumentTypeNotSupportedForExport(EDocuments, EDocService);
         until EDocuments.Next() = 0;
 
-        if HasUnsupportedDocumentType then
+        EDocuments.MarkedOnly(true);
+        if not HasSupportedDocument then
             exit;
 
         EDocuments.FindSet();
@@ -304,7 +296,6 @@ codeunit 6102 "E-Doc. Export"
             SourceDocumentLines.Close();
             EDocumentProcessing.ModifyServiceStatus(EDocuments, EDocService, Enum::"E-Document Service Status"::Created);
             EDocumentProcessing.ModifyEDocumentStatus(EDocuments);
-            EDocumentsErrorCount.Add(EDocuments."Entry No", EDocumentErrorHelper.ErrorMessageCount(EDocuments));
         until EDocuments.Next() = 0;
 
         // Clear filters and find mapped records
@@ -314,6 +305,26 @@ codeunit 6102 "E-Doc. Export"
         SourceDocumentLineMapped.FindSet();
 
         CreateEDocumentBatch(EDocService, EDocuments, SourceDocumentHeaderMapped, SourceDocumentLineMapped, TempBlob);
+    end;
+
+    local procedure LogDocumentTypeNotSupportedForExport(var EDocument: Record "E-Document"; EDocumentService: Record "E-Document Service")
+    var
+        EDocumentServiceStatus: Record "E-Document Service Status";
+        EDocumentLog: Codeunit "E-Document Log";
+        EDocServiceStatus: Enum "E-Document Service Status";
+    begin
+        EDocumentErrorHelper.LogSimpleErrorMessage(EDocument, StrSubstNo(DocumentTypeNotSupportedForExportErr, EDocument."Document Type", EDocumentService.Code));
+        EDocServiceStatus := Enum::"E-Document Service Status"::"Export Error";
+        EDocumentLog.InsertLog(EDocument, EDocumentService, EDocServiceStatus);
+
+        EDocumentServiceStatus.ReadIsolation(IsolationLevel::ReadUncommitted);
+        EDocumentServiceStatus.SetRange("E-Document Entry No", EDocument."Entry No");
+        EDocumentServiceStatus.SetRange("E-Document Service Code", EDocumentService.Code);
+        if EDocumentServiceStatus.IsEmpty() then
+            EDocumentProcessing.InsertServiceStatus(EDocument, EDocumentService, EDocServiceStatus)
+        else
+            EDocumentProcessing.ModifyServiceStatus(EDocument, EDocumentService, EDocServiceStatus);
+        EDocumentProcessing.ModifyEDocumentStatus(EDocument);
     end;
 
     internal procedure Recreate(EDocument: Record "E-Document"; EDocService: Record "E-Document Service")

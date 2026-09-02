@@ -356,6 +356,7 @@ page 6133 "E-Document Service"
         if not InitializeSupportedTypes or (Rec.Code = '') then
             exit;
 
+        CurrPage.SaveRecord();
         Rec.Validate("Document Format");
         InitializeSupportedTypes := false;
     end;

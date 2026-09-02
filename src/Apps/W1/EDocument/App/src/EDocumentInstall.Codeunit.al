@@ -19,14 +19,24 @@ codeunit 6161 "E-Document Install"
     Subtype = Install;
 
     trigger OnInstallAppPerCompany()
-    var
-        EDocumentUpgrade: Codeunit "E-Document Upgrade";
-        UpgradeTag: Codeunit "Upgrade Tag";
     begin
         InsertDataExch();
         InsertDataExchV2();
-        if not UpgradeTag.HasUpgradeTag(EDocumentUpgrade.GetUpgradeSupportedTypeDirectionTag()) then
-            UpgradeTag.SetUpgradeTag(EDocumentUpgrade.GetUpgradeSupportedTypeDirectionTag());
+        HandleSupportedTypeDirectionUpgrade();
+    end;
+
+    local procedure HandleSupportedTypeDirectionUpgrade()
+    var
+        EDocumentUpgrade: Codeunit "E-Document Upgrade";
+        UpgradeTag: Codeunit "Upgrade Tag";
+        CurrentModuleInfo: ModuleInfo;
+    begin
+        NavApp.GetCurrentModuleInfo(CurrentModuleInfo);
+        if CurrentModuleInfo.DataVersion() = Version.Create(0, 0, 0, 0) then begin
+            if not UpgradeTag.HasUpgradeTag(EDocumentUpgrade.GetUpgradeSupportedTypeDirectionTag()) then
+                UpgradeTag.SetUpgradeTag(EDocumentUpgrade.GetUpgradeSupportedTypeDirectionTag());
+        end else
+            EDocumentUpgrade.UpgradeSupportedTypeDirection();
     end;
 
 #if not CLEAN29

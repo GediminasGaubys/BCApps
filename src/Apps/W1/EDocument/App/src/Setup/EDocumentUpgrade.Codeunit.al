@@ -136,6 +136,7 @@ codeunit 6168 "E-Document Upgrade"
         if not EDocServiceSupportedType.IsEmpty() then
             EDocServiceSupportedType.ModifyAll(Direction, EDocServiceSupportedType.Direction::Both);
 
+        EDocumentService.SetLoadFields(Code);
         if EDocumentService.FindSet() then
             repeat
                 foreach EDocumentType in EDocumentType.Ordinals() do
