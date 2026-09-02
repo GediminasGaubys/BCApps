@@ -50,6 +50,8 @@ codeunit 139898 "E-Doc. Serv. Supp. Type Test"
 
         // [THEN] 4 supported document types are seeded for the service.
         this.AssertSupportedTypeCountAndCloseServiceCard(EDocServiceCode, 4, EDocumentServicePage);
+        // [THEN] No unexpected page-handler interactions remain queued.
+        this.LibraryVariableStorage.AssertEmpty();
     end;
 
     [Test]
@@ -218,6 +220,8 @@ codeunit 139898 "E-Doc. Serv. Supp. Type Test"
 
         // [THEN] No supported document types are re-seeded.
         this.AssertSupportedTypesEmptyAndCloseServiceCard(EDocServiceCode, EDocumentServicePage);
+        // [THEN] No unexpected page-handler interactions remain queued.
+        this.LibraryVariableStorage.AssertEmpty();
     end;
 
     [Test]

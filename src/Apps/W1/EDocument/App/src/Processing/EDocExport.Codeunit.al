@@ -264,39 +264,39 @@ codeunit 6102 "E-Doc. Export"
         HasSupportedDocument: Boolean;
         I: Integer;
     begin
-        EDocuments.FindSet();
-        repeat
-            EDocumentsErrorCount.Add(EDocuments."Entry No", EDocumentErrorHelper.ErrorMessageCount(EDocuments));
-            if IsDocumentTypeSupported(EDocService, EDocuments."Document Type") then begin
-                EDocuments.Mark(true);
-                HasSupportedDocument := true;
-            end else
-                LogDocumentTypeNotSupportedForExport(EDocuments, EDocService);
-        until EDocuments.Next() = 0;
+        if EDocuments.FindSet() then
+            repeat
+                EDocumentsErrorCount.Add(EDocuments."Entry No", EDocumentErrorHelper.ErrorMessageCount(EDocuments));
+                if IsDocumentTypeSupported(EDocService, EDocuments."Document Type") then begin
+                    EDocuments.Mark(true);
+                    HasSupportedDocument := true;
+                end else
+                    LogDocumentTypeNotSupportedForExport(EDocuments, EDocService);
+            until EDocuments.Next() = 0;
 
         EDocuments.MarkedOnly(true);
         if not HasSupportedDocument then
             exit;
 
-        EDocuments.FindSet();
         I := 0;
-        repeat
-            TempEDocMapping.DeleteAll();
-            SourceDocumentHeader.Get(EDocuments."Document Record ID");
-            EDocumentProcessing.GetLines(EDocuments, SourceDocumentLines);
-            MapEDocument(SourceDocumentHeader, SourceDocumentLines, EDocService, SourceDocumentHeaderMapped, SourceDocumentLineMapped, TempEDocMapping, false);
-            if TempEDocMapping.FindSet() then
-                repeat
-                    TempEDocMappingLogs.InitFromMapping(TempEDocMapping);
-                    TempEDocMappingLogs."Entry No." := I; // We need to set key for temp record when inserting
-                    TempEDocMappingLogs.Validate("E-Doc Entry No.", EDocuments."Entry No");
-                    TempEDocMappingLogs.Insert();
-                    I += 1;
-                until TempEDocMapping.Next() = 0;
-            SourceDocumentLines.Close();
-            EDocumentProcessing.ModifyServiceStatus(EDocuments, EDocService, Enum::"E-Document Service Status"::Created);
-            EDocumentProcessing.ModifyEDocumentStatus(EDocuments);
-        until EDocuments.Next() = 0;
+        if EDocuments.FindSet() then
+            repeat
+                TempEDocMapping.DeleteAll();
+                SourceDocumentHeader.Get(EDocuments."Document Record ID");
+                EDocumentProcessing.GetLines(EDocuments, SourceDocumentLines);
+                MapEDocument(SourceDocumentHeader, SourceDocumentLines, EDocService, SourceDocumentHeaderMapped, SourceDocumentLineMapped, TempEDocMapping, false);
+                if TempEDocMapping.FindSet() then
+                    repeat
+                        TempEDocMappingLogs.InitFromMapping(TempEDocMapping);
+                        TempEDocMappingLogs."Entry No." := I; // We need to set key for temp record when inserting
+                        TempEDocMappingLogs.Validate("E-Doc Entry No.", EDocuments."Entry No");
+                        TempEDocMappingLogs.Insert();
+                        I += 1;
+                    until TempEDocMapping.Next() = 0;
+                SourceDocumentLines.Close();
+                EDocumentProcessing.ModifyServiceStatus(EDocuments, EDocService, Enum::"E-Document Service Status"::Created);
+                EDocumentProcessing.ModifyEDocumentStatus(EDocuments);
+            until EDocuments.Next() = 0;
 
         // Clear filters and find mapped records
         SourceDocumentHeaderMapped.Reset();
