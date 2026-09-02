@@ -309,7 +309,7 @@ table 6121 "E-Document"
         {
             Clustered = true;
         }
-        key(Key2; "Document Record ID")
+        key(Key2; "Document Record ID", "Entry No")
         {
         }
         key(Key3; "Incoming E-Document No.", "Bill-to/Pay-to No.", "Document Date", "Entry No")
@@ -319,6 +319,9 @@ table 6121 "E-Document"
         {
         }
         key(DueDate; "Due Date")
+        {
+        }
+        key(DocumentIdentity; "Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No")
         {
         }
     }
@@ -563,6 +566,7 @@ table 6121 "E-Document"
     begin
         if DocumentNo = '' then
             exit('');
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
         this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
         EDocument.SetLoadFields(Status);
         if EDocument.FindLast() then
@@ -576,6 +580,7 @@ table 6121 "E-Document"
     begin
         if DocumentNo = '' then
             exit(false);
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
         this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
         exit(not EDocument.IsEmpty());
     end;
@@ -591,6 +596,7 @@ table 6121 "E-Document"
             Message(NoEDocumentForRecordMsg);
             exit(false);
         end;
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
         this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
         case EDocument.Count() of
             0:

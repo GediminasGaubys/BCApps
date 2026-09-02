@@ -52,12 +52,8 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
-        CustLedgerEntry: Record "Cust. Ledger Entry";
-        PostingDate: Date;
     begin
-        if CustLedgerEntry.Get(Rec."Ledger Entry No.") then
-            PostingDate := CustLedgerEntry."Posting Date";
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", PostingDate, Rec."Source No.");
+        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", 0D, Rec."Source No.");
     end;
 
     var

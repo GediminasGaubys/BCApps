@@ -11,7 +11,7 @@ page 6187 "E-Doc. Status FactBox"
     UsageCategory = None;
     Caption = 'E-Document';
     SourceTable = "E-Document";
-    SourceTableView = sorting("Entry No") order(descending);
+    SourceTableView = sorting("Document Record ID", "Entry No") order(descending);
     Editable = false;
     InsertAllowed = false;
     DeleteAllowed = false;
