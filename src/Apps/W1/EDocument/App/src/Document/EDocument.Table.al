@@ -309,7 +309,7 @@ table 6121 "E-Document"
         {
             Clustered = true;
         }
-        key(Key2; "Document Record ID", "Entry No")
+        key(Key2; "Document Record ID")
         {
         }
         key(Key3; "Incoming E-Document No.", "Bill-to/Pay-to No.", "Document Date", "Entry No")
@@ -319,6 +319,9 @@ table 6121 "E-Document"
         {
         }
         key(DueDate; "Due Date")
+        {
+        }
+        key(DocumentRecordLatest; "Document Record ID", "Entry No")
         {
         }
         key(DocumentIdentity; "Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No")
