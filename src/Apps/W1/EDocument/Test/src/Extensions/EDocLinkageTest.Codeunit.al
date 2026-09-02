@@ -8,7 +8,7 @@ using Microsoft.eServices.EDocument;
 using Microsoft.Foundation.Navigate;
 using System.TestLibraries.Utilities;
 
-codeunit 139632 "E-Doc. Linkage Test"
+codeunit 139557 "E-Doc. Linkage Test"
 {
     Subtype = Test;
     TestType = IntegrationTest;
