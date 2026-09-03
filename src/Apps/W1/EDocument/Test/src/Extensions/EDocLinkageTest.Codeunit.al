@@ -508,14 +508,14 @@ codeunit 139557 "E-Doc. Linkage Test"
 
     local procedure AssertNoEDocumentMessageShown()
     begin
-        Assert.AreEqual(this.NoEDocumentForRecordMsg, this.LibraryVariableStorage.DequeueText(), this.WrongValueErr);
+        this.Assert.AreEqual(this.NoEDocumentForRecordMsg, this.LibraryVariableStorage.DequeueText(), this.WrongValueErr);
     end;
 
     local procedure AssertDocumentEntryHasEDocumentRow(var TempDocumentEntry: Record "Document Entry" temporary; ExpectedCount: Integer)
     begin
         TempDocumentEntry.SetRange("Table ID", Database::"E-Document");
-        Assert.IsTrue(TempDocumentEntry.FindFirst(), 'Expected a Document Entry row for the E-Document table.');
-        Assert.AreEqual(ExpectedCount, TempDocumentEntry."No. of Records", this.WrongValueErr);
+        this.Assert.IsTrue(TempDocumentEntry.FindFirst(), 'Expected a Document Entry row for the E-Document table.');
+        this.Assert.AreEqual(ExpectedCount, TempDocumentEntry."No. of Records", this.WrongValueErr);
     end;
 
     local procedure AssertDocumentEntryHasNoEDocumentRow(var TempDocumentEntry: Record "Document Entry" temporary)
