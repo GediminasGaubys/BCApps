@@ -1,4 +1,4 @@
-﻿// ------------------------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------------------------
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See License.txt in the project root for license information.
 // ------------------------------------------------------------------------------------------------
@@ -6,6 +6,7 @@ namespace Microsoft.Purchases.Document;
 
 using Microsoft.eServices.EDocument;
 using Microsoft.eServices.EDocument.OrderMatch;
+using Microsoft.eServices.EDocument.Processing.Message;
 
 pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
 {
@@ -23,6 +24,21 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
                 Visible = true;
             }
         }
+        addlast(FactBoxes)
+        {
+            part(EDocStatusFactBox; "E-Doc. Status FactBox")
+            {
+                ApplicationArea = Basic, Suite;
+                Caption = 'E-Document';
+                ShowFilter = false;
+            }
+            part(EDocMessages; "E-Document Messages FactBox")
+            {
+                ApplicationArea = Basic, Suite;
+                Caption = 'E-Document Messages';
+                ShowFilter = false;
+            }
+        }
     }
     actions
     {
@@ -30,6 +46,30 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
         {
             group("E-Document")
             {
+                action("OpenEDocument")
+                {
+                    ApplicationArea = Basic, Suite;
+                    Caption = 'Open';
+                    Image = Open;
+                    ToolTip = 'Opens the related E-Document card.';
+                    Enabled = EDocumentExists;
+
+                    trigger OnAction()
+                    var
+                        EDocument: Record "E-Document";
+                        EDocumentPage: Page "E-Document";
+                    begin
+                        if EDocument.HasEDocument(Rec.RecordId()) then begin
+                            EDocument.OpenEDocument(Rec.RecordId());
+                            exit;
+                        end;
+                        if not IsNullGuid(Rec."E-Document Link") then
+                            if EDocument.GetBySystemId(Rec."E-Document Link") then begin
+                                EDocumentPage.SetRecord(EDocument);
+                                EDocumentPage.RunModal();
+                            end;
+                    end;
+                }
                 action(MatchToOrder)
                 {
                     Caption = 'Map E-Document Lines';
@@ -109,6 +149,7 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
 
     var
         ShowMapToEDocument: Boolean;
+        EDocumentExists: Boolean;
 
     trigger OnAfterGetCurrRecord()
     var
@@ -116,12 +157,15 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
         EDocumentServiceStatus: Record "E-Document Service Status";
     begin
         ShowMapToEDocument := false;
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId()) or (not IsNullGuid(Rec."E-Document Link"));
         if not IsNullGuid(Rec."E-Document Link") then begin
             EDocument.GetBySystemId(Rec."E-Document Link");
             EDocumentServiceStatus.SetRange("E-Document Entry No", EDocument."Entry No");
             EDocumentServiceStatus.FindFirst();
             ShowMapToEDocument := EDocumentServiceStatus.Status = Enum::"E-Document Service Status"::"Order Linked";
         end;
-    end;
 
+        CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
+        CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
+    end;
 }

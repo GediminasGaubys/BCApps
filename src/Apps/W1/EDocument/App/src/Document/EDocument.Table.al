@@ -321,6 +321,12 @@ table 6121 "E-Document"
         key(DueDate; "Due Date")
         {
         }
+        key(DocumentRecordLatest; "Document Record ID", "Entry No")
+        {
+        }
+        key(DocumentIdentity; "Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No")
+        {
+        }
     }
 
     trigger OnDelete()
@@ -515,11 +521,113 @@ table 6121 "E-Document"
     var
         EDocument: Record "E-Document";
         EDocumentPage: Page "E-Document";
+        EDocumentsPage: Page "E-Documents";
     begin
         EDocument.SetRange("Document Record ID", EDocumentRecordId);
-        EDocument.FindFirst();
-        EDocumentPage.SetTableView(EDocument);
-        EDocumentPage.RunModal();
+        // A source record may relate to several e-documents (resend, correction, cancel-and-recreate).
+        case EDocument.Count() of
+            0:
+                exit;
+            1:
+                begin
+                    EDocument.FindFirst();
+                    EDocumentPage.SetTableView(EDocument);
+                    EDocumentPage.RunModal();
+                end;
+            else begin
+                EDocumentsPage.SetTableView(EDocument);
+                EDocumentsPage.RunModal();
+            end;
+        end;
+    end;
+
+    internal procedure HasEDocument(EDocumentRecordId: RecordId): Boolean
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocument.SetRange("Document Record ID", EDocumentRecordId);
+        exit(not EDocument.IsEmpty());
+    end;
+
+    internal procedure GetLatestStatus(SourceRecordId: RecordId): Text
+    var
+        EDocument: Record "E-Document";
+    begin
+        if SourceRecordId.TableNo = 0 then
+            exit('');
+        EDocument.SetRange("Document Record ID", SourceRecordId);
+        EDocument.SetLoadFields(Status);
+        if EDocument.FindLast() then
+            exit(Format(EDocument.Status));
+        exit('');
+    end;
+
+    // Overload for pages whose rows are not the source document itself (e.g. ledger entries, payment registration).
+    internal procedure GetLatestStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Text
+    var
+        EDocument: Record "E-Document";
+    begin
+        if DocumentNo = '' then
+            exit('');
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        EDocument.SetLoadFields(Status);
+        if EDocument.FindLast() then
+            exit(Format(EDocument.Status));
+        exit('');
+    end;
+
+    internal procedure HasEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Boolean
+    var
+        EDocument: Record "E-Document";
+    begin
+        if DocumentNo = '' then
+            exit(false);
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        exit(not EDocument.IsEmpty());
+    end;
+
+    internal procedure TryOpenEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Boolean
+    var
+        EDocument: Record "E-Document";
+        EDocumentPage: Page "E-Document";
+        EDocumentsPage: Page "E-Documents";
+        NoEDocumentForRecordMsg: Label 'No electronic document is linked to this record.';
+    begin
+        if DocumentNo = '' then begin
+            Message(NoEDocumentForRecordMsg);
+            exit(false);
+        end;
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        case EDocument.Count() of
+            0:
+                begin
+                    Message(NoEDocumentForRecordMsg);
+                    exit(false);
+                end;
+            1:
+                begin
+                    EDocument.FindFirst();
+                    EDocumentPage.SetTableView(EDocument);
+                    EDocumentPage.RunModal();
+                end;
+            else begin
+                EDocumentsPage.SetTableView(EDocument);
+                EDocumentsPage.RunModal();
+            end;
+        end;
+        exit(true);
+    end;
+
+    local procedure SetDocumentIdentityFilters(var EDocument: Record "E-Document"; DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    begin
+        EDocument.SetRange("Document No.", DocumentNo);
+        if PostingDate <> 0D then
+            EDocument.SetRange("Posting Date", PostingDate);
+        if PartnerNo <> '' then
+            EDocument.SetRange("Bill-to/Pay-to No.", PartnerNo);
     end;
 
     internal procedure ShowRecord()
