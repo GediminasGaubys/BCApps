@@ -38,7 +38,7 @@ codeunit 139557 "E-Doc. Linkage Test"
         LinkedRecordId := this.CreateEDocumentLinkedToRecord();
 
         //[WHEN] HasEDocument is called with that record id.
-        Assert.IsTrue(EDocument.HasEDocument(LinkedRecordId), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocument(LinkedRecordId), this.WrongValueErr);
 
         //[THEN] Verified in WHEN — the call returned true.
     end;
@@ -59,7 +59,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocument is called with that record id.
         //[THEN] It returns false.
-        Assert.IsFalse(EDocument.HasEDocument(UnlinkedRecordId), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocument(UnlinkedRecordId), this.WrongValueErr);
     end;
 
     [Test]
@@ -77,7 +77,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with the same identity.
         //[THEN] It returns true.
-        Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-001', WorkDate(), 'C-001'), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-001', WorkDate(), 'C-001'), this.WrongValueErr);
     end;
 
     [Test]
@@ -95,7 +95,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with an empty document no.
         //[THEN] It returns false.
-        Assert.IsFalse(EDocument.HasEDocumentForDocument('', WorkDate(), 'C-002'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('', WorkDate(), 'C-002'), this.WrongValueErr);
     end;
 
     [Test]
@@ -113,7 +113,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with a different posting date.
         //[THEN] It returns false.
-        Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-003', WorkDate() + 1, 'C-003'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-003', WorkDate() + 1, 'C-003'), this.WrongValueErr);
     end;
 
     [Test]
@@ -131,7 +131,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with a different partner.
         //[THEN] It returns false.
-        Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-004', WorkDate(), 'C-999'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-004', WorkDate(), 'C-999'), this.WrongValueErr);
     end;
 
     [Test]
@@ -149,7 +149,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called without a posting date filter.
         //[THEN] It returns true because the posting date filter is skipped.
-        Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-005', 0D, 'C-005'), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-005', 0D, 'C-005'), this.WrongValueErr);
     end;
 
     [Test]
@@ -167,7 +167,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called without a partner filter.
         //[THEN] It returns true because the partner filter is skipped.
-        Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-006', WorkDate(), ''), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-006', WorkDate(), ''), this.WrongValueErr);
     end;
 
     [Test]
@@ -185,7 +185,83 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with a different document no.
         //[THEN] It returns false.
-        Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-999', WorkDate(), 'C-007'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-999', WorkDate(), 'C-007'), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure GetLatestStatusReturnsBlankWhenRecordIdHasNoEDocument()
+    var
+        EDocument: Record "E-Document";
+        UnlinkedRecordId: RecordId;
+    begin
+        //[SCENARIO] GetLatestStatus(RecordId) returns blank when no E-Document is linked to the given record id.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] A record id for which no E-Document exists.
+        UnlinkedRecordId := this.GetRecordIdWithoutEDocument();
+
+        //[WHEN] GetLatestStatus is called with that record id.
+        //[THEN] It returns blank.
+        this.Assert.AreEqual('', EDocument.GetLatestStatus(UnlinkedRecordId), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure GetLatestStatusReturnsLatestStatusForRecordId()
+    var
+        EDocument: Record "E-Document";
+        LinkedRecordId: RecordId;
+    begin
+        //[SCENARIO] GetLatestStatus(RecordId) returns the status of the most recently created E-Document when several are linked to the same record.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] Two E-Documents are linked to the same record id, the newest one being in error.
+        LinkedRecordId := this.CreateEDocumentLinkedToRecordWithStatus(Enum::"E-Document Status"::Processed);
+        this.LinkEDocumentToRecordWithStatus(LinkedRecordId, Enum::"E-Document Status"::Error);
+
+        //[WHEN] GetLatestStatus is called with that record id.
+        //[THEN] It returns the status of the newest E-Document.
+        this.Assert.AreEqual(Format(Enum::"E-Document Status"::Error), EDocument.GetLatestStatus(LinkedRecordId), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure GetLatestStatusForDocumentReturnsBlankWhenDocumentNoEmpty()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] GetLatestStatus(DocumentNo, PostingDate, PartnerNo) returns blank when the document number is empty.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] An E-Document with a specific identity exists.
+        this.CreateEDocumentWithIdentity('INV-015', WorkDate(), 'C-015');
+
+        //[WHEN] GetLatestStatus is called with an empty document no.
+        //[THEN] It returns blank.
+        this.Assert.AreEqual('', EDocument.GetLatestStatus('', WorkDate(), 'C-015'), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure GetLatestStatusForDocumentReturnsLatestStatusForIdentity()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] GetLatestStatus(DocumentNo, PostingDate, PartnerNo) returns the status of the most recently created E-Document sharing that identity.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] Two E-Documents share the same identity, the newest one being processed.
+        this.CreateEDocumentWithIdentityAndStatus('INV-016', WorkDate(), 'C-016', Enum::"E-Document Status"::"In Progress");
+        this.CreateEDocumentWithIdentityAndStatus('INV-016', WorkDate(), 'C-016', Enum::"E-Document Status"::Processed);
+
+        //[WHEN] GetLatestStatus is called with the shared identity.
+        //[THEN] It returns the status of the newest E-Document.
+        this.Assert.AreEqual(Format(Enum::"E-Document Status"::Processed), EDocument.GetLatestStatus('INV-016', WorkDate(), 'C-016'), this.WrongValueErr);
     end;
 
     [Test]
@@ -203,7 +279,7 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.CreateEDocumentWithIdentity('INV-008', WorkDate(), 'C-008');
 
         //[WHEN] TryOpenEDocumentForDocument is called with an empty document no.
-        Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('', WorkDate(), 'C-008'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('', WorkDate(), 'C-008'), this.WrongValueErr);
 
         //[THEN] The "no e-document" message was shown.
         this.AssertNoEDocumentMessageShown();
@@ -224,16 +300,55 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.CreateEDocumentWithIdentity('INV-009', WorkDate(), 'C-009');
 
         //[WHEN] TryOpenEDocumentForDocument is called with an unmatched document no.
-        Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('INV-NOPE', WorkDate(), 'C-009'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('INV-NOPE', WorkDate(), 'C-009'), this.WrongValueErr);
 
         //[THEN] The "no e-document" message was shown.
         this.AssertNoEDocumentMessageShown();
     end;
 
     [Test]
+    [HandlerFunctions('EDocumentCardModalPageHandler')]
+    procedure TryOpenEDocumentForDocumentOpensCardWhenOneMatch()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] TryOpenEDocumentForDocument returns true and opens the E-Document card when exactly one E-Document matches.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] A single E-Document with a specific identity exists.
+        this.CreateEDocumentWithIdentity('INV-013', WorkDate(), 'C-013');
+
+        //[WHEN] TryOpenEDocumentForDocument is called with the matching identity.
+        //[THEN] The E-Document card opens for the matching record (verified in the ModalPageHandler).
+        this.LibraryVariableStorage.Enqueue('INV-013');
+        this.Assert.IsTrue(EDocument.TryOpenEDocumentForDocument('INV-013', WorkDate(), 'C-013'), this.WrongValueErr);
+    end;
+
+    [Test]
+    [HandlerFunctions('EDocumentsListModalPageHandler')]
+    procedure TryOpenEDocumentForDocumentOpensListWhenMultipleMatches()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] TryOpenEDocumentForDocument returns true and opens the E-Documents list when more than one E-Document matches.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] Two E-Documents with the same identity exist.
+        this.CreateTwoEDocumentsWithSameIdentity('INV-014', WorkDate(), 'C-014');
+
+        //[WHEN] TryOpenEDocumentForDocument is called with the shared identity.
+        //[THEN] The E-Documents list opens showing both matching records (verified in the ModalPageHandler).
+        this.Assert.IsTrue(EDocument.TryOpenEDocumentForDocument('INV-014', WorkDate(), 'C-014'), this.WrongValueErr);
+    end;
+
+    [Test]
     procedure NavigateHandlerFindEDocumentsInsertsRowWhenMatchExists()
     var
-        DocumentEntry: Record "Document Entry" temporary;
+        TempDocumentEntry: Record "Document Entry" temporary;
         EDocNavigateHandler: Codeunit "E-Doc. Navigate Handler";
     begin
         //[SCENARIO] E-Doc. Navigate Handler.FindEDocuments inserts a Document Entry row for the E-Document table when a match exists.
@@ -245,16 +360,16 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.CreateEDocumentWithIdentity('INV-010', WorkDate(), 'C-010');
 
         //[WHEN] FindEDocuments is called with matching filters.
-        EDocNavigateHandler.FindEDocuments(DocumentEntry, 'INV-010', Format(WorkDate()));
+        EDocNavigateHandler.FindEDocuments(TempDocumentEntry, 'INV-010', Format(WorkDate()));
 
         //[THEN] A Document Entry row for the E-Document table is present with one record.
-        this.AssertDocumentEntryHasEDocumentRow(DocumentEntry, 1);
+        this.AssertDocumentEntryHasEDocumentRow(TempDocumentEntry, 1);
     end;
 
     [Test]
     procedure NavigateHandlerFindEDocumentsInsertsNoRowWhenNoMatch()
     var
-        DocumentEntry: Record "Document Entry" temporary;
+        TempDocumentEntry: Record "Document Entry" temporary;
         EDocNavigateHandler: Codeunit "E-Doc. Navigate Handler";
     begin
         //[SCENARIO] E-Doc. Navigate Handler.FindEDocuments does not insert a Document Entry row when no E-Document matches.
@@ -266,16 +381,16 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.CreateEDocumentWithIdentity('INV-011', WorkDate(), 'C-011');
 
         //[WHEN] FindEDocuments is called with a document no. that does not match.
-        EDocNavigateHandler.FindEDocuments(DocumentEntry, 'INV-NOMATCH', Format(WorkDate()));
+        EDocNavigateHandler.FindEDocuments(TempDocumentEntry, 'INV-NOMATCH', Format(WorkDate()));
 
         //[THEN] No Document Entry row for the E-Document table is inserted.
-        this.AssertDocumentEntryHasNoEDocumentRow(DocumentEntry);
+        this.AssertDocumentEntryHasNoEDocumentRow(TempDocumentEntry);
     end;
 
     [Test]
     procedure NavigateHandlerFindEDocumentsCountsAllMatchingRecords()
     var
-        DocumentEntry: Record "Document Entry" temporary;
+        TempDocumentEntry: Record "Document Entry" temporary;
         EDocNavigateHandler: Codeunit "E-Doc. Navigate Handler";
     begin
         //[SCENARIO] E-Doc. Navigate Handler.FindEDocuments reports the total count of matching E-Documents.
@@ -287,10 +402,10 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.CreateTwoEDocumentsWithSameIdentity('INV-012', WorkDate(), 'C-012');
 
         //[WHEN] FindEDocuments is called with matching filters.
-        EDocNavigateHandler.FindEDocuments(DocumentEntry, 'INV-012', Format(WorkDate()));
+        EDocNavigateHandler.FindEDocuments(TempDocumentEntry, 'INV-012', Format(WorkDate()));
 
         //[THEN] The Document Entry row for the E-Document table reports two records.
-        this.AssertDocumentEntryHasEDocumentRow(DocumentEntry, 2);
+        this.AssertDocumentEntryHasEDocumentRow(TempDocumentEntry, 2);
     end;
 
     #endregion
@@ -338,7 +453,36 @@ codeunit 139557 "E-Doc. Linkage Test"
         EDocument.Delete(false);
     end;
 
+    local procedure CreateEDocumentLinkedToRecordWithStatus(Status: Enum "E-Document Status") LinkedRecordId: RecordId
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocument.Init();
+        EDocument.Direction := EDocument.Direction::Outgoing;
+        EDocument.Insert(true);
+        LinkedRecordId := EDocument.RecordId();
+        EDocument."Document Record ID" := LinkedRecordId;
+        EDocument.Status := Status;
+        EDocument.Modify(false);
+    end;
+
+    local procedure LinkEDocumentToRecordWithStatus(LinkedRecordId: RecordId; Status: Enum "E-Document Status")
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocument.Init();
+        EDocument.Direction := EDocument.Direction::Outgoing;
+        EDocument."Document Record ID" := LinkedRecordId;
+        EDocument.Status := Status;
+        EDocument.Insert(true);
+    end;
+
     local procedure CreateEDocumentWithIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    begin
+        this.CreateEDocumentWithIdentityAndStatus(DocumentNo, PostingDate, PartnerNo, Enum::"E-Document Status"::"In Progress");
+    end;
+
+    local procedure CreateEDocumentWithIdentityAndStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; Status: Enum "E-Document Status")
     var
         EDocument: Record "E-Document";
     begin
@@ -348,6 +492,7 @@ codeunit 139557 "E-Doc. Linkage Test"
         EDocument."Document No." := DocumentNo;
         EDocument."Posting Date" := PostingDate;
         EDocument."Bill-to/Pay-to No." := PartnerNo;
+        EDocument.Status := Status;
         EDocument.Modify(false);
     end;
 
@@ -366,17 +511,17 @@ codeunit 139557 "E-Doc. Linkage Test"
         Assert.AreEqual(this.NoEDocumentForRecordMsg, this.LibraryVariableStorage.DequeueText(), this.WrongValueErr);
     end;
 
-    local procedure AssertDocumentEntryHasEDocumentRow(var DocumentEntry: Record "Document Entry"; ExpectedCount: Integer)
+    local procedure AssertDocumentEntryHasEDocumentRow(var TempDocumentEntry: Record "Document Entry" temporary; ExpectedCount: Integer)
     begin
-        DocumentEntry.SetRange("Table ID", Database::"E-Document");
-        Assert.IsTrue(DocumentEntry.FindFirst(), 'Expected a Document Entry row for the E-Document table.');
-        Assert.AreEqual(ExpectedCount, DocumentEntry."No. of Records", this.WrongValueErr);
+        TempDocumentEntry.SetRange("Table ID", Database::"E-Document");
+        Assert.IsTrue(TempDocumentEntry.FindFirst(), 'Expected a Document Entry row for the E-Document table.');
+        Assert.AreEqual(ExpectedCount, TempDocumentEntry."No. of Records", this.WrongValueErr);
     end;
 
-    local procedure AssertDocumentEntryHasNoEDocumentRow(var DocumentEntry: Record "Document Entry")
+    local procedure AssertDocumentEntryHasNoEDocumentRow(var TempDocumentEntry: Record "Document Entry" temporary)
     begin
-        DocumentEntry.SetRange("Table ID", Database::"E-Document");
-        Assert.IsTrue(DocumentEntry.IsEmpty(), 'Expected no Document Entry row for the E-Document table.');
+        TempDocumentEntry.SetRange("Table ID", Database::"E-Document");
+        this.Assert.IsTrue(TempDocumentEntry.IsEmpty(), 'Expected no Document Entry row for the E-Document table.');
     end;
 
     #endregion
@@ -385,5 +530,18 @@ codeunit 139557 "E-Doc. Linkage Test"
     procedure MessageHandler(Message: Text[1024])
     begin
         this.LibraryVariableStorage.Enqueue(Message);
+    end;
+
+    [ModalPageHandler]
+    procedure EDocumentCardModalPageHandler(var EDocumentPage: TestPage "E-Document")
+    begin
+        this.Assert.AreEqual(this.LibraryVariableStorage.DequeueText(), EDocumentPage."Document No.".Value(), this.WrongValueErr);
+    end;
+
+    [ModalPageHandler]
+    procedure EDocumentsListModalPageHandler(var EDocumentsPage: TestPage "E-Documents")
+    begin
+        this.Assert.IsTrue(EDocumentsPage.First(), this.WrongValueErr);
+        this.Assert.IsTrue(EDocumentsPage.Next(), this.WrongValueErr);
     end;
 }
