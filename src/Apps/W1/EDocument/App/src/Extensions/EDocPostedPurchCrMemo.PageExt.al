@@ -59,7 +59,7 @@ pageextension 6147 "E-Doc. Posted Purch. Cr. Memo" extends "Posted Purchase Cred
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentExists := EDocument.IsEDocumentCreatedForRecord(Rec);
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId());
         CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;

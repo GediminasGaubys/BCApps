@@ -79,7 +79,7 @@ pageextension 6142 "E-Doc. Posted Service Inv." extends "Posted Service Invoice"
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentExists := EDocument.IsEDocumentCreatedForRecord(Rec);
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId());
         CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;

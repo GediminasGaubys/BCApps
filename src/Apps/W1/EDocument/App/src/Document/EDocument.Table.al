@@ -541,6 +541,13 @@ table 6121 "E-Document"
         end;
     end;
 
+    internal procedure IsEDocumentInUse(): Boolean
+    var
+        EDocument: Record "E-Document";
+    begin
+        exit(not EDocument.IsEmpty());
+    end;
+
     internal procedure HasEDocument(EDocumentRecordId: RecordId): Boolean
     var
         EDocument: Record "E-Document";
@@ -621,7 +628,10 @@ table 6121 "E-Document"
         exit(true);
     end;
 
-    local procedure SetDocumentIdentityFilters(var EDocument: Record "E-Document"; DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    // Made internal (rather than local) so pages that surface e-document status/messages by document
+    // identity (ledger entries, payment registration) can reuse the same filter logic instead of
+    // duplicating it.
+    internal procedure SetDocumentIdentityFilters(var EDocument: Record "E-Document"; DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
     begin
         EDocument.SetRange("Document No.", DocumentNo);
         if PostingDate <> 0D then

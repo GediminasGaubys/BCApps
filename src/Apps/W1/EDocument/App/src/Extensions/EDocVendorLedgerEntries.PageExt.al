@@ -5,6 +5,7 @@
 namespace Microsoft.Purchases.Payables;
 
 using Microsoft.eServices.EDocument;
+using Microsoft.eServices.EDocument.Processing.Message;
 
 pageextension 6112 "E-Doc. Vendor Ledger Entries" extends "Vendor Ledger Entries"
 {
@@ -19,6 +20,21 @@ pageextension 6112 "E-Doc. Vendor Ledger Entries" extends "Vendor Ledger Entries
                 ToolTip = 'Specifies the status of the latest electronic document linked to this record. Hidden by default; add it via Personalize to make it visible.';
                 Visible = false;
                 Editable = false;
+            }
+        }
+        addlast(FactBoxes)
+        {
+            part(EDocStatusFactBox; "E-Doc. Status FactBox")
+            {
+                ApplicationArea = Basic, Suite;
+                Caption = 'E-Document';
+                ShowFilter = false;
+            }
+            part(EDocMessages; "E-Document Messages FactBox")
+            {
+                ApplicationArea = Basic, Suite;
+                Caption = 'E-Document Messages';
+                ShowFilter = false;
             }
         }
     }
@@ -50,13 +66,29 @@ pageextension 6112 "E-Doc. Vendor Ledger Entries" extends "Vendor Ledger Entries
         }
     }
 
+    trigger OnOpenPage()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+    end;
+
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
     begin
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
+        EDocumentStatusText := '';
+        if EDocumentFeatureInUse then
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
+    end;
+
+    trigger OnAfterGetCurrRecord()
+    begin
+        CurrPage.EDocStatusFactBox.Page.SetDocumentIdentity(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
+        CurrPage.EDocMessages.Page.SetSourceDocumentIdentity(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
     end;
 
     var
+        EDocumentFeatureInUse: Boolean;
         EDocumentStatusText: Text;
 }

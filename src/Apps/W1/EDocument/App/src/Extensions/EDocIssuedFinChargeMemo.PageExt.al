@@ -79,7 +79,7 @@ pageextension 6149 "E-Doc. Issued Fin. Charge Memo" extends "Issued Finance Char
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentExists := EDocument.IsEDocumentCreatedForRecord(Rec);
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId());
         CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());
         CurrPage.EDocStatusFactBox.Page.SetDocumentRecordId(Rec.RecordId());
     end;

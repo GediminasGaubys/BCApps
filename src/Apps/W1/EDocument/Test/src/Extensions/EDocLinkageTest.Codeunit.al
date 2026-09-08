@@ -408,6 +408,77 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.AssertDocumentEntryHasEDocumentRow(TempDocumentEntry, 2);
     end;
 
+    [Test]
+    procedure GetLatestStatusForDocumentWorksForIncomingEDocuments()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] GetLatestStatus(DocumentNo, PostingDate, PartnerNo) works the same way for incoming
+        // e-documents as for outgoing ones - linkage must not assume a direction.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] An incoming E-Document with a specific identity and status exists.
+        this.CreateEDocumentWithIdentityDirectionAndStatus('INV-013', WorkDate(), 'C-013', Enum::"E-Document Direction"::Incoming, Enum::"E-Document Status"::Processed);
+
+        //[WHEN] GetLatestStatus is called with the matching identity.
+        //[THEN] It returns the status of the incoming E-Document.
+        this.Assert.AreEqual(Format(Enum::"E-Document Status"::Processed), EDocument.GetLatestStatus('INV-013', WorkDate(), 'C-013'), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure HasEDocumentForDocumentWorksForIncomingEDocuments()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] HasEDocumentForDocument works the same way for incoming e-documents as for outgoing ones.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] An incoming E-Document with a specific identity exists.
+        this.CreateEDocumentWithIdentityDirectionAndStatus('INV-014', WorkDate(), 'C-014', Enum::"E-Document Direction"::Incoming, Enum::"E-Document Status"::"In Progress");
+
+        //[WHEN] HasEDocumentForDocument is called with the matching identity.
+        //[THEN] It returns true.
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-014', WorkDate(), 'C-014'), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure IsEDocumentInUseReturnsFalseWhenNoEDocumentsExist()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] IsEDocumentInUse returns false when the company has no E-Documents at all - this is
+        // what pages over large tables (ledger entries) use to skip per-row status lookups entirely.
+
+        //[GIVEN] Test setup exists and no E-Documents exist.
+        this.Initialize();
+
+        //[WHEN] IsEDocumentInUse is called.
+        //[THEN] It returns false.
+        this.Assert.IsFalse(EDocument.IsEDocumentInUse(), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure IsEDocumentInUseReturnsTrueWhenAnyEDocumentExists()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] IsEDocumentInUse returns true as soon as any E-Document exists, regardless of what it links to.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] An E-Document exists, unrelated to any specific source record.
+        this.CreateEDocumentWithIdentity('INV-015', WorkDate(), 'C-015');
+
+        //[WHEN] IsEDocumentInUse is called.
+        //[THEN] It returns true.
+        this.Assert.IsTrue(EDocument.IsEDocumentInUse(), this.WrongValueErr);
+    end;
+
     #endregion
 
     #region Initialize
@@ -483,11 +554,16 @@ codeunit 139557 "E-Doc. Linkage Test"
     end;
 
     local procedure CreateEDocumentWithIdentityAndStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; Status: Enum "E-Document Status")
+    begin
+        this.CreateEDocumentWithIdentityDirectionAndStatus(DocumentNo, PostingDate, PartnerNo, Enum::"E-Document Direction"::Outgoing, Status);
+    end;
+
+    local procedure CreateEDocumentWithIdentityDirectionAndStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; Direction: Enum "E-Document Direction"; Status: Enum "E-Document Status")
     var
         EDocument: Record "E-Document";
     begin
         EDocument.Init();
-        EDocument.Direction := EDocument.Direction::Outgoing;
+        EDocument.Direction := Direction;
         EDocument.Insert(true);
         EDocument."Document No." := DocumentNo;
         EDocument."Posting Date" := PostingDate;

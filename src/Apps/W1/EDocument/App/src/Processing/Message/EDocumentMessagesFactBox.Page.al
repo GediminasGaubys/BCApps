@@ -113,6 +113,28 @@ page 6434 "E-Document Messages FactBox"
         CurrPage.Update(false);
     end;
 
+    internal procedure SetSourceDocumentIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    var
+        EDocument: Record "E-Document";
+        FilterTxt: TextBuilder;
+    begin
+        EDocument.SetLoadFields("Entry No");
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
+        EDocument.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        if EDocument.FindSet() then
+            repeat
+                if FilterTxt.Length() > 0 then
+                    FilterTxt.Append('|');
+                FilterTxt.Append(Format(EDocument."Entry No"));
+            until EDocument.Next() = 0;
+
+        if FilterTxt.Length() > 0 then
+            Rec.SetFilter("E-Document Entry No.", FilterTxt.ToText())
+        else
+            Rec.SetRange("E-Document Entry No.", -1);
+        CurrPage.Update(false);
+    end;
+
     local procedure BuildFileName(): Text
     var
         ResponseTypeText: Text;

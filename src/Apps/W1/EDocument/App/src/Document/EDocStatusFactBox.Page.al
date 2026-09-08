@@ -108,4 +108,13 @@ page 6187 "E-Doc. Status FactBox"
         Rec.SetRange("Document Record ID", RecId);
         CurrPage.Update(false);
     end;
+
+    internal procedure SetDocumentIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    var
+        EDocument: Record "E-Document";
+    begin
+        Rec.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
+        EDocument.SetDocumentIdentityFilters(Rec, DocumentNo, PostingDate, PartnerNo);
+        CurrPage.Update(false);
+    end;
 }

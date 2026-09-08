@@ -5,6 +5,7 @@
 namespace Microsoft.Bank.Payment;
 
 using Microsoft.eServices.EDocument;
+using Microsoft.eServices.EDocument.Processing.Message;
 using Microsoft.Sales.Receivables;
 
 pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
@@ -22,6 +23,21 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
                 Editable = false;
             }
         }
+        addlast(FactBoxes)
+        {
+            part(EDocStatusFactBox; "E-Doc. Status FactBox")
+            {
+                ApplicationArea = Basic, Suite;
+                Caption = 'E-Document';
+                ShowFilter = false;
+            }
+            part(EDocMessages; "E-Document Messages FactBox")
+            {
+                ApplicationArea = Basic, Suite;
+                Caption = 'E-Document Messages';
+                ShowFilter = false;
+            }
+        }
     }
     actions
     {
@@ -37,25 +53,47 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
 
                 trigger OnAction()
                 var
-                    CustLedgerEntry: Record "Cust. Ledger Entry";
                     EDocument: Record "E-Document";
-                    PostingDate: Date;
                 begin
-                    if CustLedgerEntry.Get(Rec."Ledger Entry No.") then
-                        PostingDate := CustLedgerEntry."Posting Date";
-                    EDocument.TryOpenEDocumentForDocument(Rec."Document No.", PostingDate, Rec."Source No.");
+                    EDocument.TryOpenEDocumentForDocument(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
                 end;
             }
         }
     }
 
+    trigger OnOpenPage()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+    end;
+
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
     begin
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", 0D, Rec."Source No.");
+        ApplicablePostingDate := GetApplicablePostingDate();
+        EDocumentStatusText := '';
+        if EDocumentFeatureInUse then
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
+    end;
+
+    trigger OnAfterGetCurrRecord()
+    begin
+        CurrPage.EDocStatusFactBox.Page.SetDocumentIdentity(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
+        CurrPage.EDocMessages.Page.SetSourceDocumentIdentity(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
+    end;
+
+    local procedure GetApplicablePostingDate() PostingDate: Date
+    var
+        CustLedgerEntry: Record "Cust. Ledger Entry";
+    begin
+        if CustLedgerEntry.Get(Rec."Ledger Entry No.") then
+            PostingDate := CustLedgerEntry."Posting Date";
     end;
 
     var
+        EDocumentFeatureInUse: Boolean;
         EDocumentStatusText: Text;
+        ApplicablePostingDate: Date;
 }
