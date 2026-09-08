@@ -55,7 +55,7 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
                 var
                     EDocument: Record "E-Document";
                 begin
-                    EDocument.TryOpenEDocumentForDocument(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
+                    EDocument.TryOpenEDocumentForDocument(Rec."Document No.", ApplicablePostingDate, Rec."Source No.", Enum::"E-Document Direction"::Outgoing, ApplicableDocumentType);
                 end;
             }
         }
@@ -72,28 +72,44 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
     var
         EDocumentLookup: Record "E-Document";
     begin
-        ApplicablePostingDate := GetApplicablePostingDate();
+        this.UpdateApplicableLedgerEntryData();
         EDocumentStatusText := '';
         if EDocumentFeatureInUse then
-            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", ApplicablePostingDate, Rec."Source No.", Enum::"E-Document Direction"::Outgoing, ApplicableDocumentType);
     end;
 
     trigger OnAfterGetCurrRecord()
     begin
-        CurrPage.EDocStatusFactBox.Page.SetDocumentIdentity(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
-        CurrPage.EDocMessages.Page.SetSourceDocumentIdentity(Rec."Document No.", ApplicablePostingDate, Rec."Source No.");
+        CurrPage.EDocStatusFactBox.Page.SetDocumentIdentity(Rec."Document No.", ApplicablePostingDate, Rec."Source No.", Enum::"E-Document Direction"::Outgoing, ApplicableDocumentType);
+        CurrPage.EDocMessages.Page.SetSourceDocumentIdentity(Rec."Document No.", ApplicablePostingDate, Rec."Source No.", Enum::"E-Document Direction"::Outgoing, ApplicableDocumentType);
     end;
 
-    local procedure GetApplicablePostingDate() PostingDate: Date
+    local procedure UpdateApplicableLedgerEntryData()
     var
         CustLedgerEntry: Record "Cust. Ledger Entry";
     begin
-        if CustLedgerEntry.Get(Rec."Ledger Entry No.") then
-            PostingDate := CustLedgerEntry."Posting Date";
+        Clear(ApplicablePostingDate);
+        ApplicableDocumentType := Enum::"E-Document Type"::None;
+
+        if not CustLedgerEntry.Get(Rec."Ledger Entry No.") then
+            exit;
+
+        ApplicablePostingDate := CustLedgerEntry."Posting Date";
+        case CustLedgerEntry."Document Type" of
+            CustLedgerEntry."Document Type"::Invoice:
+                ApplicableDocumentType := Enum::"E-Document Type"::"Sales Invoice";
+            CustLedgerEntry."Document Type"::"Credit Memo":
+                ApplicableDocumentType := Enum::"E-Document Type"::"Sales Credit Memo";
+            CustLedgerEntry."Document Type"::"Finance Charge Memo":
+                ApplicableDocumentType := Enum::"E-Document Type"::"Issued Finance Charge Memo";
+            CustLedgerEntry."Document Type"::Reminder:
+                ApplicableDocumentType := Enum::"E-Document Type"::"Issued Reminder";
+        end;
     end;
 
     var
         EDocumentFeatureInUse: Boolean;
-        EDocumentStatusText: Text;
         ApplicablePostingDate: Date;
+        ApplicableDocumentType: Enum "E-Document Type";
+        EDocumentStatusText: Text;
 }

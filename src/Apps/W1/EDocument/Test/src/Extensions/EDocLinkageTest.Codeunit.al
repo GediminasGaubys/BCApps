@@ -77,7 +77,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with the same identity.
         //[THEN] It returns true.
-        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-001', WorkDate(), 'C-001'), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-001', WorkDate(), 'C-001', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -95,7 +95,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with an empty document no.
         //[THEN] It returns false.
-        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('', WorkDate(), 'C-002'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('', WorkDate(), 'C-002', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -113,7 +113,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with a different posting date.
         //[THEN] It returns false.
-        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-003', WorkDate() + 1, 'C-003'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-003', WorkDate() + 1, 'C-003', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -131,7 +131,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with a different partner.
         //[THEN] It returns false.
-        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-004', WorkDate(), 'C-999'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-004', WorkDate(), 'C-999', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -149,7 +149,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called without a posting date filter.
         //[THEN] It returns true because the posting date filter is skipped.
-        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-005', 0D, 'C-005'), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-005', 0D, 'C-005', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -167,7 +167,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called without a partner filter.
         //[THEN] It returns true because the partner filter is skipped.
-        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-006', WorkDate(), ''), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-006', WorkDate(), '', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -185,7 +185,27 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] HasEDocumentForDocument is called with a different document no.
         //[THEN] It returns false.
-        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-999', WorkDate(), 'C-007'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-999', WorkDate(), 'C-007', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure HasEDocumentForDocumentDoesNotMatchDifferentDirection()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] HasEDocumentForDocument does not match an E-Document that shares the same document no.,
+        // posting date, and partner no. but has a different direction (e.g. a purchase invoice colliding with
+        // a sales invoice number for the same partner code).
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] An incoming E-Document with a specific identity exists.
+        this.CreateEDocumentWithIdentityDirectionAndStatus('INV-017', WorkDate(), 'C-017', Enum::"E-Document Direction"::Incoming, Enum::"E-Document Status"::"In Progress");
+
+        //[WHEN] HasEDocumentForDocument is called with the same identity but the opposite direction.
+        //[THEN] It returns false.
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-017', WorkDate(), 'C-017', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -242,7 +262,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] GetLatestStatus is called with an empty document no.
         //[THEN] It returns blank.
-        this.Assert.AreEqual('', EDocument.GetLatestStatus('', WorkDate(), 'C-015'), this.WrongValueErr);
+        this.Assert.AreEqual('', EDocument.GetLatestStatus('', WorkDate(), 'C-015', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -261,7 +281,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] GetLatestStatus is called with the shared identity.
         //[THEN] It returns the status of the newest E-Document.
-        this.Assert.AreEqual(Format(Enum::"E-Document Status"::Processed), EDocument.GetLatestStatus('INV-016', WorkDate(), 'C-016'), this.WrongValueErr);
+        this.Assert.AreEqual(Format(Enum::"E-Document Status"::Processed), EDocument.GetLatestStatus('INV-016', WorkDate(), 'C-016', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -279,7 +299,7 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.CreateEDocumentWithIdentity('INV-008', WorkDate(), 'C-008');
 
         //[WHEN] TryOpenEDocumentForDocument is called with an empty document no.
-        this.Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('', WorkDate(), 'C-008'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('', WorkDate(), 'C-008', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
 
         //[THEN] The "no e-document" message was shown.
         this.AssertNoEDocumentMessageShown();
@@ -300,7 +320,7 @@ codeunit 139557 "E-Doc. Linkage Test"
         this.CreateEDocumentWithIdentity('INV-009', WorkDate(), 'C-009');
 
         //[WHEN] TryOpenEDocumentForDocument is called with an unmatched document no.
-        this.Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('INV-NOPE', WorkDate(), 'C-009'), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.TryOpenEDocumentForDocument('INV-NOPE', WorkDate(), 'C-009', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
 
         //[THEN] The "no e-document" message was shown.
         this.AssertNoEDocumentMessageShown();
@@ -323,7 +343,7 @@ codeunit 139557 "E-Doc. Linkage Test"
         //[WHEN] TryOpenEDocumentForDocument is called with the matching identity.
         //[THEN] The E-Document card opens for the matching record (verified in the ModalPageHandler).
         this.LibraryVariableStorage.Enqueue('INV-013');
-        this.Assert.IsTrue(EDocument.TryOpenEDocumentForDocument('INV-013', WorkDate(), 'C-013'), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.TryOpenEDocumentForDocument('INV-013', WorkDate(), 'C-013', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -342,7 +362,7 @@ codeunit 139557 "E-Doc. Linkage Test"
 
         //[WHEN] TryOpenEDocumentForDocument is called with the shared identity.
         //[THEN] The E-Documents list opens showing both matching records (verified in the ModalPageHandler).
-        this.Assert.IsTrue(EDocument.TryOpenEDocumentForDocument('INV-014', WorkDate(), 'C-014'), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.TryOpenEDocumentForDocument('INV-014', WorkDate(), 'C-014', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
     end;
 
     [Test]
@@ -409,43 +429,6 @@ codeunit 139557 "E-Doc. Linkage Test"
     end;
 
     [Test]
-    procedure GetLatestStatusForDocumentWorksForIncomingEDocuments()
-    var
-        EDocument: Record "E-Document";
-    begin
-        //[SCENARIO] GetLatestStatus(DocumentNo, PostingDate, PartnerNo) works the same way for incoming
-        // e-documents as for outgoing ones - linkage must not assume a direction.
-
-        //[GIVEN] Test setup exists.
-        this.Initialize();
-
-        //[GIVEN] An incoming E-Document with a specific identity and status exists.
-        this.CreateEDocumentWithIdentityDirectionAndStatus('INV-013', WorkDate(), 'C-013', Enum::"E-Document Direction"::Incoming, Enum::"E-Document Status"::Processed);
-
-        //[WHEN] GetLatestStatus is called with the matching identity.
-        //[THEN] It returns the status of the incoming E-Document.
-        this.Assert.AreEqual(Format(Enum::"E-Document Status"::Processed), EDocument.GetLatestStatus('INV-013', WorkDate(), 'C-013'), this.WrongValueErr);
-    end;
-
-    [Test]
-    procedure HasEDocumentForDocumentWorksForIncomingEDocuments()
-    var
-        EDocument: Record "E-Document";
-    begin
-        //[SCENARIO] HasEDocumentForDocument works the same way for incoming e-documents as for outgoing ones.
-
-        //[GIVEN] Test setup exists.
-        this.Initialize();
-
-        //[GIVEN] An incoming E-Document with a specific identity exists.
-        this.CreateEDocumentWithIdentityDirectionAndStatus('INV-014', WorkDate(), 'C-014', Enum::"E-Document Direction"::Incoming, Enum::"E-Document Status"::"In Progress");
-
-        //[WHEN] HasEDocumentForDocument is called with the matching identity.
-        //[THEN] It returns true.
-        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-014', WorkDate(), 'C-014'), this.WrongValueErr);
-    end;
-
-    [Test]
     procedure IsEDocumentInUseReturnsFalseWhenNoEDocumentsExist()
     var
         EDocument: Record "E-Document";
@@ -477,6 +460,113 @@ codeunit 139557 "E-Doc. Linkage Test"
         //[WHEN] IsEDocumentInUse is called.
         //[THEN] It returns true.
         this.Assert.IsTrue(EDocument.IsEDocumentInUse(), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure HasEDocumentForDocumentDoesNotMatchDifferentDocumentType()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] HasEDocumentForDocument does not match an E-Document that shares the same document no.,
+        // posting date, partner no. and direction but has a different Document Type (e.g. an invoice and a
+        // credit memo that happen to reuse the same document/partner combination).
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] A Sales Invoice E-Document with a specific identity exists.
+        this.CreateEDocumentWithIdentityDirectionTypeAndStatus('INV-018', WorkDate(), 'C-018', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::"Sales Invoice", Enum::"E-Document Status"::"In Progress");
+
+        //[WHEN] HasEDocumentForDocument is called with the same identity but a different Document Type.
+        //[THEN] It returns false.
+        this.Assert.IsFalse(EDocument.HasEDocumentForDocument('INV-018', WorkDate(), 'C-018', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::"Sales Credit Memo"), this.WrongValueErr);
+
+        //[WHEN] HasEDocumentForDocument is called with the matching Document Type.
+        //[THEN] It returns true.
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-018', WorkDate(), 'C-018', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::"Sales Invoice"), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure HasEDocumentForDocumentIgnoresDocumentTypeWhenNone()
+    var
+        EDocument: Record "E-Document";
+    begin
+        //[SCENARIO] HasEDocumentForDocument does not filter on Document Type when "None" is passed, preserving
+        // the behavior expected by callers that cannot derive a Document Type (e.g. payments/refunds).
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] A Sales Invoice E-Document with a specific identity exists.
+        this.CreateEDocumentWithIdentityDirectionTypeAndStatus('INV-019', WorkDate(), 'C-019', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::"Sales Invoice", Enum::"E-Document Status"::"In Progress");
+
+        //[WHEN] HasEDocumentForDocument is called without a Document Type filter.
+        //[THEN] It returns true because the Document Type filter is skipped.
+        this.Assert.IsTrue(EDocument.HasEDocumentForDocument('INV-019', WorkDate(), 'C-019', Enum::"E-Document Direction"::Outgoing, Enum::"E-Document Type"::None), this.WrongValueErr);
+    end;
+
+    [Test]
+    procedure OpenEDocumentDoesNothingWhenNoMatch()
+    var
+        EDocument: Record "E-Document";
+        UnlinkedRecordId: RecordId;
+    begin
+        //[SCENARIO] OpenEDocument(RecordId) does nothing (no page opens, no message) when no E-Document is
+        // linked to the given record id.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] A record id for which no E-Document exists.
+        UnlinkedRecordId := this.GetRecordIdWithoutEDocument();
+
+        //[WHEN] OpenEDocument is called with that record id.
+        //[THEN] No page opens - a stray RunModal() with no registered handler would fail the test.
+        EDocument.OpenEDocument(UnlinkedRecordId);
+    end;
+
+    [Test]
+    [HandlerFunctions('EDocumentCardModalPageHandler')]
+    procedure OpenEDocumentOpensCardWhenOneMatch()
+    var
+        EDocument: Record "E-Document";
+        LinkedRecordId: RecordId;
+    begin
+        //[SCENARIO] OpenEDocument(RecordId) opens the E-Document card when exactly one E-Document is linked
+        // to the given record id.
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] A single E-Document linked to a specific record id.
+        LinkedRecordId := this.CreateEDocumentLinkedToRecord();
+
+        //[WHEN] OpenEDocument is called with that record id.
+        //[THEN] The E-Document card opens for the matching record (verified in the ModalPageHandler).
+        this.LibraryVariableStorage.Enqueue('');
+        EDocument.OpenEDocument(LinkedRecordId);
+    end;
+
+    [Test]
+    [HandlerFunctions('EDocumentsListModalPageHandler')]
+    procedure OpenEDocumentOpensListWhenMultipleMatches()
+    var
+        EDocument: Record "E-Document";
+        LinkedRecordId: RecordId;
+    begin
+        //[SCENARIO] OpenEDocument(RecordId) opens the E-Documents list when more than one E-Document is
+        // linked to the given record id (resend, correction, cancel-and-recreate scenarios).
+
+        //[GIVEN] Test setup exists.
+        this.Initialize();
+
+        //[GIVEN] Two E-Documents are linked to the same record id.
+        LinkedRecordId := this.CreateEDocumentLinkedToRecord();
+        this.LinkEDocumentToRecordWithStatus(LinkedRecordId, Enum::"E-Document Status"::Processed);
+
+        //[WHEN] OpenEDocument is called with that record id.
+        //[THEN] The E-Documents list opens showing both matching records (verified in the ModalPageHandler).
+        EDocument.OpenEDocument(LinkedRecordId);
     end;
 
     #endregion
@@ -568,6 +658,21 @@ codeunit 139557 "E-Doc. Linkage Test"
         EDocument."Document No." := DocumentNo;
         EDocument."Posting Date" := PostingDate;
         EDocument."Bill-to/Pay-to No." := PartnerNo;
+        EDocument.Status := Status;
+        EDocument.Modify(false);
+    end;
+
+    local procedure CreateEDocumentWithIdentityDirectionTypeAndStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; Direction: Enum "E-Document Direction"; DocumentType: Enum "E-Document Type"; Status: Enum "E-Document Status")
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocument.Init();
+        EDocument.Direction := Direction;
+        EDocument.Insert(true);
+        EDocument."Document No." := DocumentNo;
+        EDocument."Posting Date" := PostingDate;
+        EDocument."Bill-to/Pay-to No." := PartnerNo;
+        EDocument."Document Type" := DocumentType;
         EDocument.Status := Status;
         EDocument.Modify(false);
     end;

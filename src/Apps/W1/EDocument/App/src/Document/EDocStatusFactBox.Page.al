@@ -47,6 +47,18 @@ page 6187 "E-Doc. Status FactBox"
                     Caption = 'Document No.';
                     ToolTip = 'Specifies the document number of the e-document.';
                 }
+                field(ServiceStatus; ServiceStatusText)
+                {
+                    ApplicationArea = Basic, Suite;
+                    Caption = 'Service Status';
+                    ToolTip = 'Specifies the status of the e-document service that processed this e-document.';
+                }
+                field(LastActivityAt; LastActivityAt)
+                {
+                    ApplicationArea = Basic, Suite;
+                    Caption = 'Last Activity';
+                    ToolTip = 'Specifies the date and time of the most recent log activity for this e-document.';
+                }
             }
         }
     }
@@ -103,18 +115,42 @@ page 6187 "E-Doc. Status FactBox"
         }
     }
 
+    var
+        LastActivityAt: DateTime;
+        ServiceStatusText: Text;
+
+    trigger OnAfterGetRecord()
+    var
+        EDocumentLog: Record "E-Document Log";
+        EDocumentServiceStatus: Record "E-Document Service Status";
+    begin
+        ServiceStatusText := '';
+        EDocumentServiceStatus.SetRange("E-Document Entry No", Rec."Entry No");
+        EDocumentServiceStatus.SetRange("E-Document Service Code", Rec.Service);
+        if EDocumentServiceStatus.FindFirst() then
+            ServiceStatusText := Format(EDocumentServiceStatus.Status);
+
+        Clear(LastActivityAt);
+        EDocumentLog.SetRange("E-Doc. Entry No", Rec."Entry No");
+        EDocumentLog.SetCurrentKey("Entry No.");
+        EDocumentLog.SetAscending("Entry No.", false);
+        EDocumentLog.SetLoadFields(SystemCreatedAt);
+        if EDocumentLog.FindFirst() then
+            LastActivityAt := EDocumentLog.SystemCreatedAt;
+    end;
+
     internal procedure SetDocumentRecordId(RecId: RecordId)
     begin
         Rec.SetRange("Document Record ID", RecId);
         CurrPage.Update(false);
     end;
 
-    internal procedure SetDocumentIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    internal procedure SetDocumentIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; EDocumentDirection: Enum "E-Document Direction"; DocumentType: Enum "E-Document Type")
     var
         EDocument: Record "E-Document";
     begin
-        Rec.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
-        EDocument.SetDocumentIdentityFilters(Rec, DocumentNo, PostingDate, PartnerNo);
+        Rec.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No");
+        EDocument.SetDocumentIdentityFilters(Rec, DocumentNo, PostingDate, PartnerNo, EDocumentDirection, DocumentType);
         CurrPage.Update(false);
     end;
 }

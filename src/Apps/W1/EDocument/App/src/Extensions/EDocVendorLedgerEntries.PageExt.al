@@ -54,7 +54,7 @@ pageextension 6112 "E-Doc. Vendor Ledger Entries" extends "Vendor Ledger Entries
                 var
                     EDocument: Record "E-Document";
                 begin
-                    EDocument.TryOpenEDocumentForDocument(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
+                    EDocument.TryOpenEDocumentForDocument(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.", Enum::"E-Document Direction"::Incoming, this.MapToEDocumentType());
                 end;
             }
         }
@@ -79,16 +79,28 @@ pageextension 6112 "E-Doc. Vendor Ledger Entries" extends "Vendor Ledger Entries
     begin
         EDocumentStatusText := '';
         if EDocumentFeatureInUse then
-            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.", Enum::"E-Document Direction"::Incoming, this.MapToEDocumentType());
     end;
 
     trigger OnAfterGetCurrRecord()
     begin
-        CurrPage.EDocStatusFactBox.Page.SetDocumentIdentity(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
-        CurrPage.EDocMessages.Page.SetSourceDocumentIdentity(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.");
+        CurrPage.EDocStatusFactBox.Page.SetDocumentIdentity(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.", Enum::"E-Document Direction"::Incoming, this.MapToEDocumentType());
+        CurrPage.EDocMessages.Page.SetSourceDocumentIdentity(Rec."Document No.", Rec."Posting Date", Rec."Vendor No.", Enum::"E-Document Direction"::Incoming, this.MapToEDocumentType());
     end;
 
     var
         EDocumentFeatureInUse: Boolean;
         EDocumentStatusText: Text;
+
+    local procedure MapToEDocumentType(): Enum "E-Document Type"
+    begin
+        case Rec."Document Type" of
+            Rec."Document Type"::Invoice:
+                exit(Enum::"E-Document Type"::"Purchase Invoice");
+            Rec."Document Type"::"Credit Memo":
+                exit(Enum::"E-Document Type"::"Purchase Credit Memo");
+            else
+                exit(Enum::"E-Document Type"::None);
+        end;
+    end;
 }

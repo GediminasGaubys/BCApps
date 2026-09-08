@@ -23,13 +23,23 @@ pageextension 6120 "E-Doc. Service Cr. Memos" extends "Service Credit Memos"
         }
     }
 
+    trigger OnOpenPage()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+    end;
+
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
     begin
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
+        EDocumentStatusText := '';
+        if EDocumentFeatureInUse then
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
+        EDocumentFeatureInUse: Boolean;
         EDocumentStatusText: Text;
 }

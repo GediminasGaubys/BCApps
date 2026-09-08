@@ -324,7 +324,7 @@ table 6121 "E-Document"
         key(DocumentRecordLatest; "Document Record ID", "Entry No")
         {
         }
-        key(DocumentIdentity; "Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No")
+        key(DocumentIdentity; "Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No")
         {
         }
     }
@@ -523,6 +523,8 @@ table 6121 "E-Document"
         EDocumentPage: Page "E-Document";
         EDocumentsPage: Page "E-Documents";
     begin
+        if not EDocument.ReadPermission() then
+            exit;
         EDocument.SetRange("Document Record ID", EDocumentRecordId);
         // A source record may relate to several e-documents (resend, correction, cancel-and-recreate).
         case EDocument.Count() of
@@ -545,6 +547,8 @@ table 6121 "E-Document"
     var
         EDocument: Record "E-Document";
     begin
+        if not EDocument.ReadPermission() then
+            exit(false);
         exit(not EDocument.IsEmpty());
     end;
 
@@ -552,6 +556,8 @@ table 6121 "E-Document"
     var
         EDocument: Record "E-Document";
     begin
+        if not EDocument.ReadPermission() then
+            exit(false);
         EDocument.SetRange("Document Record ID", EDocumentRecordId);
         exit(not EDocument.IsEmpty());
     end;
@@ -562,6 +568,8 @@ table 6121 "E-Document"
     begin
         if SourceRecordId.TableNo = 0 then
             exit('');
+        if not EDocument.ReadPermission() then
+            exit('');
         EDocument.SetRange("Document Record ID", SourceRecordId);
         EDocument.SetLoadFields(Status);
         if EDocument.FindLast() then
@@ -569,33 +577,36 @@ table 6121 "E-Document"
         exit('');
     end;
 
-    // Overload for pages whose rows are not the source document itself (e.g. ledger entries, payment registration).
-    internal procedure GetLatestStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Text
+    internal procedure GetLatestStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; EDocumentDirection: Enum "E-Document Direction"; EDocumentType: Enum "E-Document Type"): Text
     var
         EDocument: Record "E-Document";
     begin
         if DocumentNo = '' then
             exit('');
-        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
-        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        if not EDocument.ReadPermission() then
+            exit('');
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No");
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo, EDocumentDirection, EDocumentType);
         EDocument.SetLoadFields(Status);
         if EDocument.FindLast() then
             exit(Format(EDocument.Status));
         exit('');
     end;
 
-    internal procedure HasEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Boolean
+    internal procedure HasEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; EDocumentDirection: Enum "E-Document Direction"; EDocumentType: Enum "E-Document Type"): Boolean
     var
         EDocument: Record "E-Document";
     begin
         if DocumentNo = '' then
             exit(false);
-        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
-        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+        if not EDocument.ReadPermission() then
+            exit(false);
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No");
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo, EDocumentDirection, EDocumentType);
         exit(not EDocument.IsEmpty());
     end;
 
-    internal procedure TryOpenEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]): Boolean
+    internal procedure TryOpenEDocumentForDocument(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; EDocumentDirection: Enum "E-Document Direction"; EDocumentType: Enum "E-Document Type"): Boolean
     var
         EDocument: Record "E-Document";
         EDocumentPage: Page "E-Document";
@@ -606,8 +617,12 @@ table 6121 "E-Document"
             Message(NoEDocumentForRecordMsg);
             exit(false);
         end;
-        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Entry No");
-        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo);
+
+        if not EDocument.ReadPermission() then
+            exit(false);
+
+        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No");
+        this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo, EDocumentDirection, EDocumentType);
         case EDocument.Count() of
             0:
                 begin
@@ -628,12 +643,12 @@ table 6121 "E-Document"
         exit(true);
     end;
 
-    // Made internal (rather than local) so pages that surface e-document status/messages by document
-    // identity (ledger entries, payment registration) can reuse the same filter logic instead of
-    // duplicating it.
-    internal procedure SetDocumentIdentityFilters(var EDocument: Record "E-Document"; DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])
+    internal procedure SetDocumentIdentityFilters(var EDocument: Record "E-Document"; DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; EDocumentDirection: Enum "E-Document Direction"; EDocumentType: Enum "E-Document Type")
     begin
         EDocument.SetRange("Document No.", DocumentNo);
+        EDocument.SetRange(Direction, EDocumentDirection);
+        if EDocumentType <> EDocumentType::None then
+            EDocument.SetRange("Document Type", EDocumentType);
         if PostingDate <> 0D then
             EDocument.SetRange("Posting Date", PostingDate);
         if PartnerNo <> '' then

@@ -23,13 +23,23 @@ pageextension 6150 "E-Doc. Posted Sales Invoices" extends "Posted Sales Invoices
         }
     }
 
+    trigger OnOpenPage()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+    end;
+
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
     begin
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
+        EDocumentStatusText := '';
+        if EDocumentFeatureInUse then
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
+        EDocumentFeatureInUse: Boolean;
         EDocumentStatusText: Text;
 }

@@ -35,15 +35,17 @@ codeunit 6539 "E-Doc. Navigate Handler"
     internal procedure FindEDocuments(var DocumentEntry: Record "Document Entry"; DocNoFilter: Text; PostingDateFilter: Text)
     var
         EDocument: Record "E-Document";
+        MatchCount: Integer;
     begin
         if not EDocument.ReadPermission() then
             exit;
         EDocument.Reset();
         EDocument.SetFilter("Document No.", DocNoFilter);
         EDocument.SetFilter("Posting Date", PostingDateFilter);
-        if EDocument.IsEmpty() then
+        MatchCount := EDocument.Count();
+        if MatchCount = 0 then
             exit;
-        DocumentEntry.InsertIntoDocEntry(Database::"E-Document", EDocument.TableCaption(), EDocument.Count());
+        DocumentEntry.InsertIntoDocEntry(Database::"E-Document", EDocument.TableCaption(), MatchCount);
     end;
 
     internal procedure ShowEDocuments(DocNoFilter: Text; PostingDateFilter: Text)

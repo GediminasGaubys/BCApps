@@ -23,13 +23,23 @@ pageextension 6153 "E-Doc. Issued Fin. Ch. M. List" extends "Issued Fin. Charge 
         }
     }
 
+    trigger OnOpenPage()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+    end;
+
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
     begin
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
+        EDocumentStatusText := '';
+        if EDocumentFeatureInUse then
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
+        EDocumentFeatureInUse: Boolean;
         EDocumentStatusText: Text;
 }

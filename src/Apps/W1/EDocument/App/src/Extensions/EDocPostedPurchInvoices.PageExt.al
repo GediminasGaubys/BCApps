@@ -33,11 +33,20 @@ pageextension 6109 "E-Doc. Posted Purch. Invoices" extends "Posted Purchase Invo
         }
     }
 
+    trigger OnOpenPage()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+    end;
+
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
     begin
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
+        EDocumentStatusText := '';
+        if EDocumentFeatureInUse then
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     trigger OnAfterGetCurrRecord()
@@ -51,6 +60,7 @@ pageextension 6109 "E-Doc. Posted Purch. Invoices" extends "Posted Purchase Invo
     end;
 
     var
-        EDocumentStatusText: Text;
+        EDocumentFeatureInUse: Boolean;
         ShowEDocumentPdfPreview: Boolean;
+        EDocumentStatusText: Text;
 }

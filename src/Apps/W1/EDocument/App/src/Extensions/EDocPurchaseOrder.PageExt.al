@@ -58,16 +58,18 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
                     var
                         EDocument: Record "E-Document";
                         EDocumentPage: Page "E-Document";
+                        NoEDocumentForRecordMsg: Label 'No electronic document is linked to this record.';
                     begin
                         if EDocument.HasEDocument(Rec.RecordId()) then begin
                             EDocument.OpenEDocument(Rec.RecordId());
                             exit;
                         end;
-                        if not IsNullGuid(Rec."E-Document Link") then
-                            if EDocument.GetBySystemId(Rec."E-Document Link") then begin
-                                EDocumentPage.SetRecord(EDocument);
-                                EDocumentPage.RunModal();
-                            end;
+                        if (not IsNullGuid(Rec."E-Document Link")) and EDocument.GetBySystemId(Rec."E-Document Link") then begin
+                            EDocumentPage.SetRecord(EDocument);
+                            EDocumentPage.RunModal();
+                            exit;
+                        end;
+                        Message(NoEDocumentForRecordMsg);
                     end;
                 }
                 action(MatchToOrder)
@@ -155,14 +157,15 @@ pageextension 6132 "E-Doc. Purchase Order" extends "Purchase Order"
     var
         EDocument: Record "E-Document";
         EDocumentServiceStatus: Record "E-Document Service Status";
+        LinkedEDocumentFound: Boolean;
     begin
         ShowMapToEDocument := false;
-        EDocumentExists := EDocument.HasEDocument(Rec.RecordId()) or (not IsNullGuid(Rec."E-Document Link"));
-        if not IsNullGuid(Rec."E-Document Link") then begin
-            EDocument.GetBySystemId(Rec."E-Document Link");
+        LinkedEDocumentFound := (not IsNullGuid(Rec."E-Document Link")) and EDocument.GetBySystemId(Rec."E-Document Link");
+        EDocumentExists := EDocument.HasEDocument(Rec.RecordId()) or LinkedEDocumentFound;
+        if LinkedEDocumentFound then begin
             EDocumentServiceStatus.SetRange("E-Document Entry No", EDocument."Entry No");
-            EDocumentServiceStatus.FindFirst();
-            ShowMapToEDocument := EDocumentServiceStatus.Status = Enum::"E-Document Service Status"::"Order Linked";
+            if EDocumentServiceStatus.FindFirst() then
+                ShowMapToEDocument := EDocumentServiceStatus.Status = Enum::"E-Document Service Status"::"Order Linked";
         end;
 
         CurrPage.EDocMessages.Page.SetSourceRecordId(Rec.RecordId());

@@ -121,14 +121,24 @@ pageextension 6137 "E-Doc. Purchase Order List" extends "Purchase Order List"
         end;
     end;
 
+    trigger OnOpenPage()
+    var
+        EDocument: Record "E-Document";
+    begin
+        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+    end;
+
     trigger OnAfterGetRecord()
     var
         EDocumentLookup: Record "E-Document";
     begin
-        EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
+        EDocumentStatusText := '';
+        if EDocumentFeatureInUse then
+            EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
-        EDocumentStatusText: Text;
+        EDocumentFeatureInUse: Boolean;
         ShowMapToEDocument: Boolean;
+        EDocumentStatusText: Text;
 }
