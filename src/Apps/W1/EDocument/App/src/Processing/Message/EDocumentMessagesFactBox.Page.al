@@ -113,14 +113,14 @@ page 6434 "E-Document Messages FactBox"
         CurrPage.Update(false);
     end;
 
-    internal procedure SetSourceDocumentIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; Direction: Enum "E-Document Direction"; DocumentType: Enum "E-Document Type")
+    internal procedure SetSourceDocumentIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; EDocumentDirection: Enum "E-Document Direction"; DocumentType: Enum "E-Document Type")
     var
         EDocument: Record "E-Document";
         FilterTxt: TextBuilder;
     begin
         EDocument.SetLoadFields("Entry No");
         EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No");
-        EDocument.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo, Direction, DocumentType);
+        EDocument.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo, EDocumentDirection, DocumentType);
         if EDocument.FindSet() then
             repeat
                 if FilterTxt.Length() > 0 then
