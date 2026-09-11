@@ -98,12 +98,13 @@ page 6434 "E-Document Messages FactBox"
     begin
         EDocument.SetLoadFields("Entry No");
         EDocument.SetRange("Document Record ID", SourceRecordId);
-        if EDocument.FindSet() then
-            repeat
-                if FilterTxt.Length() > 0 then
-                    FilterTxt.Append('|');
-                FilterTxt.Append(Format(EDocument."Entry No"));
-            until EDocument.Next() = 0;
+        if EDocument.ReadPermission() then
+            if EDocument.FindSet() then
+                repeat
+                    if FilterTxt.Length() > 0 then
+                        FilterTxt.Append('|');
+                    FilterTxt.Append(Format(EDocument."Entry No"));
+                until EDocument.Next() = 0;
 
         if FilterTxt.Length() > 0 then
             Rec.SetFilter("E-Document Entry No.", FilterTxt.ToText())
@@ -119,14 +120,14 @@ page 6434 "E-Document Messages FactBox"
         FilterTxt: TextBuilder;
     begin
         EDocument.SetLoadFields("Entry No");
-        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No");
         EDocument.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo, EDocumentDirection, DocumentType);
-        if EDocument.FindSet() then
-            repeat
-                if FilterTxt.Length() > 0 then
-                    FilterTxt.Append('|');
-                FilterTxt.Append(Format(EDocument."Entry No"));
-            until EDocument.Next() = 0;
+        if EDocument.ReadPermission() then
+            if EDocument.FindSet() then
+                repeat
+                    if FilterTxt.Length() > 0 then
+                        FilterTxt.Append('|');
+                    FilterTxt.Append(Format(EDocument."Entry No"));
+                until EDocument.Next() = 0;
 
         if FilterTxt.Length() > 0 then
             Rec.SetFilter("E-Document Entry No.", FilterTxt.ToText())

@@ -585,7 +585,6 @@ table 6121 "E-Document"
             exit('');
         if not EDocument.ReadPermission() then
             exit('');
-        EDocument.SetCurrentKey("Document No.", "Posting Date", "Bill-to/Pay-to No.", "Document Type", "Entry No");
         this.SetDocumentIdentityFilters(EDocument, DocumentNo, PostingDate, PartnerNo, EDocumentDirection, EDocumentType);
         EDocument.SetLoadFields(Status);
         if EDocument.FindLast() then
@@ -648,11 +647,17 @@ table 6121 "E-Document"
         EDocument.SetRange("Document No.", DocumentNo);
         EDocument.SetRange(Direction, EDocumentDirection);
         if EDocumentType <> EDocumentType::None then
-            EDocument.SetRange("Document Type", EDocumentType);
+            EDocument.SetRange("Document Type", EDocumentType)
+        else
+            EDocument.SetRange("Document Type");
         if PostingDate <> 0D then
-            EDocument.SetRange("Posting Date", PostingDate);
+            EDocument.SetRange("Posting Date", PostingDate)
+        else
+            EDocument.SetRange("Posting Date");
         if PartnerNo <> '' then
-            EDocument.SetRange("Bill-to/Pay-to No.", PartnerNo);
+            EDocument.SetRange("Bill-to/Pay-to No.", PartnerNo)
+        else
+            EDocument.SetRange("Bill-to/Pay-to No.");
     end;
 
     internal procedure ShowRecord()

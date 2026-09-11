@@ -123,12 +123,17 @@ page 6187 "E-Doc. Status FactBox"
     var
         EDocumentLog: Record "E-Document Log";
         EDocumentServiceStatus: Record "E-Document Service Status";
+        ServiceStatusTextBuilder: TextBuilder;
     begin
         ServiceStatusText := '';
         EDocumentServiceStatus.SetRange("E-Document Entry No", Rec."Entry No");
-        EDocumentServiceStatus.SetRange("E-Document Service Code", Rec.Service);
-        if EDocumentServiceStatus.FindFirst() then
-            ServiceStatusText := Format(EDocumentServiceStatus.Status);
+        if EDocumentServiceStatus.FindSet() then
+            repeat
+                if ServiceStatusTextBuilder.Length() > 0 then
+                    ServiceStatusTextBuilder.Append(', ');
+                ServiceStatusTextBuilder.Append(Format(EDocumentServiceStatus.Status));
+            until EDocumentServiceStatus.Next() = 0;
+        ServiceStatusText := ServiceStatusTextBuilder.ToText();
 
         Clear(LastActivityAt);
         EDocumentLog.SetRange("E-Doc. Entry No", Rec."Entry No");
