@@ -51,7 +51,7 @@ codeunit 6142 "E-Doc. Recurrent Batch Send"
         until EDocumentServiceStatus.Next() = 0;
 
         foreach DocumentType in EDocuments."Document Type".Ordinals() do begin
-            EDocuments.Init();
+            EDocuments.Reset();
             EDocuments.SetFilter("Entry No", EDocumentListFilter);
             EDocuments.SetRange("Document Type", DocumentType);
             if EDocuments.FindSet() then begin
