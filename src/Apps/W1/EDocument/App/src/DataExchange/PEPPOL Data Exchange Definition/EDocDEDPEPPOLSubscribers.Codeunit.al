@@ -764,24 +764,31 @@ codeunit 6162 "E-Doc. DED PEPPOL Subscribers"
     var
         EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
     begin
-        if Rec."Document Format" = Rec."Document Format"::"Data Exchange" then begin
-            EDocServiceSupportedType.SetRange("E-Document Service Code", Rec.Code);
-            if EDocServiceSupportedType.IsEmpty() then begin
-                EDocServiceSupportedType.Init();
-                EDocServiceSupportedType."E-Document Service Code" := Rec.Code;
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Sales Invoice";
-                EDocServiceSupportedType.Insert();
+        if Rec."Document Format" <> Rec."Document Format"::"Data Exchange" then
+            exit;
 
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Sales Credit Memo";
-                EDocServiceSupportedType.Insert();
+        EDocServiceSupportedType.SetRange("E-Document Service Code", Rec.Code);
+        if not EDocServiceSupportedType.IsEmpty() then
+            exit;
 
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Service Invoice";
-                EDocServiceSupportedType.Insert();
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Invoice");
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Credit Memo");
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Invoice");
+        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Credit Memo");
+    end;
 
-                EDocServiceSupportedType."Source Document Type" := EDocServiceSupportedType."Source Document Type"::"Service Credit Memo";
-                EDocServiceSupportedType.Insert();
-            end;
-        end;
+    local procedure InsertDefaultSupportedTypeIfMissing(EDocServiceCode: Code[20]; SourceDocumentType: Enum "E-Document Type")
+    var
+        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
+    begin
+        if EDocServiceSupportedType.Get(EDocServiceCode, SourceDocumentType) then
+            exit;
+
+        EDocServiceSupportedType.Init();
+        EDocServiceSupportedType."E-Document Service Code" := EDocServiceCode;
+        EDocServiceSupportedType."Source Document Type" := SourceDocumentType;
+        EDocServiceSupportedType.Direction := EDocServiceSupportedType.Direction::Outgoing;
+        EDocServiceSupportedType.Insert();
     end;
 
     var
