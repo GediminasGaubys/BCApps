@@ -771,24 +771,10 @@ codeunit 6162 "E-Doc. DED PEPPOL Subscribers"
         if not EDocServiceSupportedType.IsEmpty() then
             exit;
 
-        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Invoice");
-        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Credit Memo");
-        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Invoice");
-        InsertDefaultSupportedTypeIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Credit Memo");
-    end;
-
-    local procedure InsertDefaultSupportedTypeIfMissing(EDocServiceCode: Code[20]; SourceDocumentType: Enum "E-Document Type")
-    var
-        EDocServiceSupportedType: Record "E-Doc. Service Supported Type";
-    begin
-        if EDocServiceSupportedType.Get(EDocServiceCode, SourceDocumentType) then
-            exit;
-
-        EDocServiceSupportedType.Init();
-        EDocServiceSupportedType."E-Document Service Code" := EDocServiceCode;
-        EDocServiceSupportedType."Source Document Type" := SourceDocumentType;
-        EDocServiceSupportedType.Direction := EDocServiceSupportedType.Direction::Outgoing;
-        EDocServiceSupportedType.Insert();
+        EDocServiceSupportedType.InsertDefaultIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Invoice", Enum::"E-Doc. Supp. Type Direction"::Outgoing);
+        EDocServiceSupportedType.InsertDefaultIfMissing(Rec.Code, Enum::"E-Document Type"::"Sales Credit Memo", Enum::"E-Doc. Supp. Type Direction"::Outgoing);
+        EDocServiceSupportedType.InsertDefaultIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Invoice", Enum::"E-Doc. Supp. Type Direction"::Outgoing);
+        EDocServiceSupportedType.InsertDefaultIfMissing(Rec.Code, Enum::"E-Document Type"::"Service Credit Memo", Enum::"E-Doc. Supp. Type Direction"::Outgoing);
     end;
 
     var
