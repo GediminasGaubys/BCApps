@@ -543,7 +543,7 @@ table 6121 "E-Document"
         end;
     end;
 
-    internal procedure IsEDocumentInUse(): Boolean
+    internal procedure HasEDocument(): Boolean
     var
         EDocument: Record "E-Document";
     begin
