@@ -70,7 +70,7 @@ pageextension 6111 "E-Doc. Cust. Ledger Entries" extends "Customer Ledger Entrie
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+        HasAnyEDocument := GuiAllowed() and EDocument.HasEDocument();
     end;
 
     trigger OnAfterGetRecord()
@@ -78,7 +78,7 @@ pageextension 6111 "E-Doc. Cust. Ledger Entries" extends "Customer Ledger Entrie
         EDocumentLookup: Record "E-Document";
     begin
         EDocumentStatusText := '';
-        if EDocumentFeatureInUse then
+        if HasAnyEDocument then
             EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", Rec."Posting Date", Rec."Customer No.", Enum::"E-Document Direction"::Outgoing, this.MapToEDocumentType());
     end;
 
@@ -89,7 +89,7 @@ pageextension 6111 "E-Doc. Cust. Ledger Entries" extends "Customer Ledger Entrie
     end;
 
     var
-        EDocumentFeatureInUse: Boolean;
+        HasAnyEDocument: Boolean;
         EDocumentStatusText: Text;
 
     local procedure MapToEDocumentType(): Enum "E-Document Type"

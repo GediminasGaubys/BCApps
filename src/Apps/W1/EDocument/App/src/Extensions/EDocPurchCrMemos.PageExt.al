@@ -27,7 +27,7 @@ pageextension 6123 "E-Doc. Purch. Cr. Memos" extends "Purchase Credit Memos"
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+        HasAnyEDocument := GuiAllowed() and EDocument.HasEDocument();
     end;
 
     trigger OnAfterGetRecord()
@@ -35,11 +35,11 @@ pageextension 6123 "E-Doc. Purch. Cr. Memos" extends "Purchase Credit Memos"
         EDocumentLookup: Record "E-Document";
     begin
         EDocumentStatusText := '';
-        if EDocumentFeatureInUse then
+        if HasAnyEDocument then
             EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
-        EDocumentFeatureInUse: Boolean;
+        HasAnyEDocument: Boolean;
         EDocumentStatusText: Text;
 }

@@ -27,7 +27,7 @@ pageextension 6154 "E-Doc. Posted Transfer Shpmnts" extends "Posted Transfer Shi
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+        HasAnyEDocument := GuiAllowed() and EDocument.HasEDocument();
     end;
 
     trigger OnAfterGetRecord()
@@ -35,11 +35,11 @@ pageextension 6154 "E-Doc. Posted Transfer Shpmnts" extends "Posted Transfer Shi
         EDocumentLookup: Record "E-Document";
     begin
         EDocumentStatusText := '';
-        if EDocumentFeatureInUse then
+        if HasAnyEDocument then
             EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
-        EDocumentFeatureInUse: Boolean;
+        HasAnyEDocument: Boolean;
         EDocumentStatusText: Text;
 }

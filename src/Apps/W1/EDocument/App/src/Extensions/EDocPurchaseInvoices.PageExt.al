@@ -37,7 +37,7 @@ pageextension 6100 "E-Doc. Purchase Invoices" extends "Purchase Invoices"
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+        HasAnyEDocument := GuiAllowed() and EDocument.HasEDocument();
     end;
 
     trigger OnAfterGetRecord()
@@ -45,7 +45,7 @@ pageextension 6100 "E-Doc. Purchase Invoices" extends "Purchase Invoices"
         EDocumentLookup: Record "E-Document";
     begin
         EDocumentStatusText := '';
-        if EDocumentFeatureInUse then
+        if HasAnyEDocument then
             EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
@@ -60,7 +60,7 @@ pageextension 6100 "E-Doc. Purchase Invoices" extends "Purchase Invoices"
     end;
 
     var
-        EDocumentFeatureInUse: Boolean;
+        HasAnyEDocument: Boolean;
         ShowEDocumentPdfPreview: Boolean;
         EDocumentStatusText: Text;
 }

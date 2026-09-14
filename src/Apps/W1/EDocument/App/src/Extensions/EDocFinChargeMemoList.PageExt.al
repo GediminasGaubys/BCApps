@@ -27,7 +27,7 @@ pageextension 6127 "E-Doc. Fin. Charge Memo List" extends "Finance Charge Memo L
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+        HasAnyEDocument := GuiAllowed() and EDocument.HasEDocument();
     end;
 
     trigger OnAfterGetRecord()
@@ -35,11 +35,11 @@ pageextension 6127 "E-Doc. Fin. Charge Memo List" extends "Finance Charge Memo L
         EDocumentLookup: Record "E-Document";
     begin
         EDocumentStatusText := '';
-        if EDocumentFeatureInUse then
+        if HasAnyEDocument then
             EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
-        EDocumentFeatureInUse: Boolean;
+        HasAnyEDocument: Boolean;
         EDocumentStatusText: Text;
 }

@@ -65,7 +65,7 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+        HasAnyEDocument := GuiAllowed() and EDocument.HasEDocument();
     end;
 
     trigger OnAfterGetRecord()
@@ -74,7 +74,7 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
     begin
         this.UpdateApplicableLedgerEntryData();
         EDocumentStatusText := '';
-        if EDocumentFeatureInUse then
+        if HasAnyEDocument then
             EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec."Document No.", ApplicablePostingDate, Rec."Source No.", Enum::"E-Document Direction"::Outgoing, ApplicableDocumentType);
     end;
 
@@ -108,7 +108,7 @@ pageextension 6113 "E-Doc. Payment Registration" extends "Payment Registration"
     end;
 
     var
-        EDocumentFeatureInUse: Boolean;
+        HasAnyEDocument: Boolean;
         ApplicablePostingDate: Date;
         ApplicableDocumentType: Enum "E-Document Type";
         EDocumentStatusText: Text;

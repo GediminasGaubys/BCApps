@@ -120,28 +120,37 @@ page 6187 "E-Doc. Status FactBox"
         ServiceStatusText: Text;
 
     trigger OnAfterGetRecord()
+    begin
+        ServiceStatusText := this.GetServiceStatus();
+        LastActivityAt := this.GetLastActivityAt();
+    end;
+
+    local procedure GetServiceStatus(): Text
     var
-        EDocumentLog: Record "E-Document Log";
         EDocumentServiceStatus: Record "E-Document Service Status";
         ServiceStatusTextBuilder: TextBuilder;
     begin
-        ServiceStatusText := '';
         EDocumentServiceStatus.SetRange("E-Document Entry No", Rec."Entry No");
+        EDocumentServiceStatus.SetLoadFields(Status);
         if EDocumentServiceStatus.FindSet() then
             repeat
                 if ServiceStatusTextBuilder.Length() > 0 then
                     ServiceStatusTextBuilder.Append(', ');
                 ServiceStatusTextBuilder.Append(Format(EDocumentServiceStatus.Status));
             until EDocumentServiceStatus.Next() = 0;
-        ServiceStatusText := ServiceStatusTextBuilder.ToText();
+        exit(ServiceStatusTextBuilder.ToText());
+    end;
 
-        Clear(LastActivityAt);
+    local procedure GetLastActivityAt(): DateTime
+    var
+        EDocumentLog: Record "E-Document Log";
+    begin
         EDocumentLog.SetRange("E-Doc. Entry No", Rec."Entry No");
         EDocumentLog.SetCurrentKey("Entry No.");
         EDocumentLog.SetAscending("Entry No.", false);
         EDocumentLog.SetLoadFields(SystemCreatedAt);
         if EDocumentLog.FindFirst() then
-            LastActivityAt := EDocumentLog.SystemCreatedAt;
+            exit(EDocumentLog.SystemCreatedAt);
     end;
 
     internal procedure SetDocumentRecordId(RecId: RecordId)

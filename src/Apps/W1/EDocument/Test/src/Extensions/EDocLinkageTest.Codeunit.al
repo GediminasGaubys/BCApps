@@ -429,27 +429,27 @@ codeunit 139557 "E-Doc. Linkage Test"
     end;
 
     [Test]
-    procedure IsEDocumentInUseReturnsFalseWhenNoEDocumentsExist()
+    procedure HasEDocumentReturnsFalseWhenNoEDocumentsExist()
     var
         EDocument: Record "E-Document";
     begin
-        //[SCENARIO] IsEDocumentInUse returns false when the company has no E-Documents at all - this is
+        //[SCENARIO] HasEDocument returns false when the company has no E-Documents at all - this is
         // what pages over large tables (ledger entries) use to skip per-row status lookups entirely.
 
         //[GIVEN] Test setup exists and no E-Documents exist.
         this.Initialize();
 
-        //[WHEN] IsEDocumentInUse is called.
+        //[WHEN] HasEDocument is called.
         //[THEN] It returns false.
-        this.Assert.IsFalse(EDocument.IsEDocumentInUse(), this.WrongValueErr);
+        this.Assert.IsFalse(EDocument.HasEDocument(), this.WrongValueErr);
     end;
 
     [Test]
-    procedure IsEDocumentInUseReturnsTrueWhenAnyEDocumentExists()
+    procedure HasEDocumentReturnsTrueWhenAnyEDocumentExists()
     var
         EDocument: Record "E-Document";
     begin
-        //[SCENARIO] IsEDocumentInUse returns true as soon as any E-Document exists, regardless of what it links to.
+        //[SCENARIO] HasEDocument returns true as soon as any E-Document exists, regardless of what it links to.
 
         //[GIVEN] Test setup exists.
         this.Initialize();
@@ -457,9 +457,9 @@ codeunit 139557 "E-Doc. Linkage Test"
         //[GIVEN] An E-Document exists, unrelated to any specific source record.
         this.CreateEDocumentWithIdentity('INV-015', WorkDate(), 'C-015');
 
-        //[WHEN] IsEDocumentInUse is called.
+        //[WHEN] HasEDocument is called.
         //[THEN] It returns true.
-        this.Assert.IsTrue(EDocument.IsEDocumentInUse(), this.WrongValueErr);
+        this.Assert.IsTrue(EDocument.HasEDocument(), this.WrongValueErr);
     end;
 
     [Test]
@@ -588,16 +588,21 @@ codeunit 139557 "E-Doc. Linkage Test"
 
     #region Given
 
-    local procedure CreateEDocumentLinkedToRecord() LinkedRecordId: RecordId
-    var
-        EDocument: Record "E-Document";
+    local procedure InsertNewEDocument(var EDocument: Record "E-Document"; Direction: Enum "E-Document Direction")
     begin
         // Use the E-Document table itself as a stable source of a real RecordId — the linkage logic
         // only checks whether an "E-Document" row references the given RecordId; the target table is
         // irrelevant to the code under test.
         EDocument.Init();
-        EDocument.Direction := EDocument.Direction::Outgoing;
+        EDocument.Direction := Direction;
         EDocument.Insert(true);
+    end;
+
+    local procedure CreateEDocumentLinkedToRecord() LinkedRecordId: RecordId
+    var
+        EDocument: Record "E-Document";
+    begin
+        this.InsertNewEDocument(EDocument, Enum::"E-Document Direction"::Outgoing);
         LinkedRecordId := EDocument.RecordId();
         EDocument."Document Record ID" := LinkedRecordId;
         EDocument.Modify(false);
@@ -607,9 +612,7 @@ codeunit 139557 "E-Doc. Linkage Test"
     var
         EDocument: Record "E-Document";
     begin
-        EDocument.Init();
-        EDocument.Direction := EDocument.Direction::Outgoing;
-        EDocument.Insert(true);
+        this.InsertNewEDocument(EDocument, Enum::"E-Document Direction"::Outgoing);
         UnlinkedRecordId := EDocument.RecordId();
         EDocument.Delete(false);
     end;
@@ -618,9 +621,7 @@ codeunit 139557 "E-Doc. Linkage Test"
     var
         EDocument: Record "E-Document";
     begin
-        EDocument.Init();
-        EDocument.Direction := EDocument.Direction::Outgoing;
-        EDocument.Insert(true);
+        this.InsertNewEDocument(EDocument, Enum::"E-Document Direction"::Outgoing);
         LinkedRecordId := EDocument.RecordId();
         EDocument."Document Record ID" := LinkedRecordId;
         EDocument.Status := Status;
@@ -649,17 +650,8 @@ codeunit 139557 "E-Doc. Linkage Test"
     end;
 
     local procedure CreateEDocumentWithIdentityDirectionAndStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; Direction: Enum "E-Document Direction"; Status: Enum "E-Document Status")
-    var
-        EDocument: Record "E-Document";
     begin
-        EDocument.Init();
-        EDocument.Direction := Direction;
-        EDocument.Insert(true);
-        EDocument."Document No." := DocumentNo;
-        EDocument."Posting Date" := PostingDate;
-        EDocument."Bill-to/Pay-to No." := PartnerNo;
-        EDocument.Status := Status;
-        EDocument.Modify(false);
+        this.CreateEDocumentWithIdentityDirectionTypeAndStatus(DocumentNo, PostingDate, PartnerNo, Direction, Enum::"E-Document Type"::None, Status);
     end;
 
     local procedure CreateEDocumentWithIdentityDirectionTypeAndStatus(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20]; Direction: Enum "E-Document Direction"; DocumentType: Enum "E-Document Type"; Status: Enum "E-Document Status")
@@ -668,13 +660,12 @@ codeunit 139557 "E-Doc. Linkage Test"
     begin
         EDocument.Init();
         EDocument.Direction := Direction;
-        EDocument.Insert(true);
         EDocument."Document No." := DocumentNo;
         EDocument."Posting Date" := PostingDate;
         EDocument."Bill-to/Pay-to No." := PartnerNo;
         EDocument."Document Type" := DocumentType;
         EDocument.Status := Status;
-        EDocument.Modify(false);
+        EDocument.Insert(true);
     end;
 
     local procedure CreateTwoEDocumentsWithSameIdentity(DocumentNo: Code[20]; PostingDate: Date; PartnerNo: Code[20])

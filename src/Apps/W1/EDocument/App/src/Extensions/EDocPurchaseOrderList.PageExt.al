@@ -125,7 +125,7 @@ pageextension 6137 "E-Doc. Purchase Order List" extends "Purchase Order List"
     var
         EDocument: Record "E-Document";
     begin
-        EDocumentFeatureInUse := EDocument.IsEDocumentInUse();
+        HasAnyEDocument := GuiAllowed() and EDocument.HasEDocument();
     end;
 
     trigger OnAfterGetRecord()
@@ -133,12 +133,12 @@ pageextension 6137 "E-Doc. Purchase Order List" extends "Purchase Order List"
         EDocumentLookup: Record "E-Document";
     begin
         EDocumentStatusText := '';
-        if EDocumentFeatureInUse then
+        if HasAnyEDocument then
             EDocumentStatusText := EDocumentLookup.GetLatestStatus(Rec.RecordId());
     end;
 
     var
-        EDocumentFeatureInUse: Boolean;
+        HasAnyEDocument: Boolean;
         ShowMapToEDocument: Boolean;
         EDocumentStatusText: Text;
 }
