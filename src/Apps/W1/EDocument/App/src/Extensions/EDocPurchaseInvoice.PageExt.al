@@ -96,13 +96,17 @@ pageextension 6129 "E-Doc. Purchase Invoice" extends "Purchase Invoice"
                 }
             }
         }
-        addlast(Category_Process)
+        addlast(Promoted)
         {
-            actionref(OpenEDocumentDraft_Promoted; OpenEDocumentDraft)
+            group("E-Document Promoted")
             {
-            }
-            actionref(ViewDocumentSource_Promoted; ViewDocumentSource)
-            {
+                Caption = 'E-Document';
+                actionref(OpenEDocumentDraft_Promoted; OpenEDocumentDraft)
+                {
+                }
+                actionref(ViewDocumentSource_Promoted; ViewDocumentSource)
+                {
+                }
             }
         }
     }
