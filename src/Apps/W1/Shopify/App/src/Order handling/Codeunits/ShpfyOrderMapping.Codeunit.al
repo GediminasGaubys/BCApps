@@ -21,6 +21,11 @@ codeunit 30163 "Shpfy Order Mapping"
 
     var
         OrderEvents: Codeunit "Shpfy Order Events";
+        MappingErr: Label 'Not everything can be mapped.';
+        SellToCustomerIssueTok: Label 'SellToCustomer', Locked = true;
+        BillToCustomerIssueTok: Label 'BillToCustomer', Locked = true;
+        TipAccountIssueTok: Label 'TipAccount', Locked = true;
+        GiftCardAccountIssueTok: Label 'GiftCardAccount', Locked = true;
 
     /// <summary> 
     /// Description for DoMapping.
@@ -28,10 +33,20 @@ codeunit 30163 "Shpfy Order Mapping"
     /// <param name="OrderHeader">Parameter of type Record "Shopify Order Header".</param>
     internal procedure DoMapping(var OrderHeader: Record "Shpfy Order Header") Result: Boolean
     var
+        MissingIssues: List of [Text];
+    begin
+        exit(DoMappingWithIssues(OrderHeader, MissingIssues, 'Mapping'));
+    end;
+
+    internal procedure DoMappingWithIssues(var OrderHeader: Record "Shpfy Order Header"; var MissingIssues: List of [Text]; ExecutionMode: Text[20]) Result: Boolean
+    var
         CustomerTemplate: Record "Shpfy Customer Template";
         OrderLine: Record "Shpfy Order Line";
         Shop: Record "Shpfy Shop";
+        LineMapped: Boolean;
+        ItemLineIssueTok: Label 'ItemLine:%1', Locked = true, Comment = '%1 = Shopify line id';
     begin
+        Clear(MissingIssues);
         Shop.Get(OrderHeader."Shop Code");
 
         if not OrderHeader.B2B then begin
@@ -63,19 +78,141 @@ codeunit 30163 "Shpfy Order Mapping"
         else
             Result := MapB2BHeaderFields(OrderHeader, Shop, Shop."Auto Create Unknown Companies" and (Shop."Company Import From Shopify" <> "Shpfy Company Import Range"::None));
 
+        if OrderHeader."Sell-to Customer No." = '' then begin
+            AddUniqueIssue(MissingIssues, SellToCustomerIssueTok);
+            Result := false;
+        end;
+        if OrderHeader."Bill-to Customer No." = '' then begin
+            AddUniqueIssue(MissingIssues, BillToCustomerIssueTok);
+            Result := false;
+        end;
+
         OrderLine.SetRange("Shopify Order Id", OrderHeader."Shopify Order Id");
         if OrderLine.FindSet(true) then
             repeat
-                if OrderLine.Tip then
-                    Result := Result and (Shop."Tip Account" <> '')
-                else
-                    if OrderLine."Gift Card" then
-                        Result := Result and (Shop."Sold Gift Card Account" <> '')
-                    else
-                        Result := Result and MapVariant(OrderLine, Shop);
+                if OrderLine.Tip then begin
+                    if Shop."Tip Account" = '' then begin
+                        AddUniqueIssue(MissingIssues, TipAccountIssueTok);
+                        Result := false;
+                    end;
+                end else
+                    if OrderLine."Gift Card" then begin
+                        if Shop."Sold Gift Card Account" = '' then begin
+                            AddUniqueIssue(MissingIssues, GiftCardAccountIssueTok);
+                            Result := false;
+                        end;
+                    end else begin
+                        LineMapped := MapVariant(OrderLine, Shop);
+                        if not LineMapped then begin
+                            MissingIssues.Add(StrSubstNo(ItemLineIssueTok, Format(OrderLine."Line Id")));
+                            Result := false;
+                        end;
+                    end;
             until OrderLine.Next() = 0;
 
         OrderEvents.OnAfterMapShopifyOrder(OrderHeader, Result);
+        LogMappingIssues(MissingIssues, ExecutionMode);
+    end;
+
+    local procedure LogMappingIssues(MissingIssues: List of [Text]; ExecutionMode: Text[20])
+    var
+        Categories: List of [Text];
+        Issue: Text;
+        Category: Text;
+        Dimensions: Dictionary of [Text, Text];
+        MappingTelemetryMsg: Label 'Shopify order mapping is incomplete.', Locked = true;
+    begin
+        foreach Issue in MissingIssues do begin
+            if Issue.StartsWith('ItemLine:') then
+                Category := 'Item'
+            else
+                Category := Issue;
+            if not Categories.Contains(Category) then begin
+                Categories.Add(Category);
+                Clear(Dimensions);
+                Dimensions.Add('Category', Category);
+                Dimensions.Add('Mode', ExecutionMode);
+                Session.LogMessage('SHPCOMPLETENESS', MappingTelemetryMsg, Verbosity::Normal, DataClassification::SystemMetadata, TelemetryScope::ExtensionPublisher, Dimensions);
+            end;
+        end;
+    end;
+
+    internal procedure GetMappingErrorMessage(MissingIssues: List of [Text]): Text
+    var
+        ErrorBuilder: TextBuilder;
+        MissingIssue: Text;
+        SellToCustomerMissingErr: Label 'Sell-to Customer No. is missing.';
+        BillToCustomerMissingErr: Label 'Bill-to Customer No. is missing.';
+        TipAccountMissingErr: Label 'Tip Account must have a value in Shopify Shop.';
+        GiftCardAccountMissingErr: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
+    begin
+        ErrorBuilder.AppendLine(MappingErr);
+        foreach MissingIssue in MissingIssues do
+            case MissingIssue of
+                SellToCustomerIssueTok:
+                    ErrorBuilder.AppendLine(SellToCustomerMissingErr);
+                BillToCustomerIssueTok:
+                    ErrorBuilder.AppendLine(BillToCustomerMissingErr);
+                TipAccountIssueTok:
+                    ErrorBuilder.AppendLine(TipAccountMissingErr);
+                GiftCardAccountIssueTok:
+                    ErrorBuilder.AppendLine(GiftCardAccountMissingErr);
+            end;
+
+        exit(ErrorBuilder.ToText());
+    end;
+
+    internal procedure PersistMappingError(var OrderHeader: Record "Shpfy Order Header"; MissingIssues: List of [Text])
+    begin
+        if OrderHeader."Has Error" and not IsMappingError(OrderHeader."Error Message") then
+            exit;
+
+        SetMappingError(OrderHeader, MissingIssues);
+    end;
+
+    internal procedure SetMappingError(var OrderHeader: Record "Shpfy Order Header"; MissingIssues: List of [Text])
+    var
+        ErrorMessage: Text;
+    begin
+        ErrorMessage := Format(Time) + ' ' + GetMappingErrorMessage(MissingIssues);
+        OrderHeader."Has Error" := true;
+        OrderHeader."Error Message" := CopyStr(ErrorMessage, 1, MaxStrLen(OrderHeader."Error Message"));
+        OrderHeader.Modify();
+    end;
+
+    internal procedure ClearMappingError(var OrderHeader: Record "Shpfy Order Header")
+    begin
+        if not IsMappingError(OrderHeader."Error Message") then
+            exit;
+
+        OrderHeader."Has Error" := false;
+        OrderHeader."Error Message" := '';
+        OrderHeader.Modify();
+    end;
+
+    local procedure IsMappingError(ErrorMessage: Text): Boolean
+    var
+        ErrorTime: Time;
+        MappingErrorPosition: Integer;
+        TimestampText: Text;
+    begin
+        if ErrorMessage.StartsWith(MappingErr) then
+            exit(true);
+
+        MappingErrorPosition := StrPos(ErrorMessage, MappingErr);
+        if MappingErrorPosition <= 2 then
+            exit(false);
+        if CopyStr(ErrorMessage, MappingErrorPosition - 1, 1) <> ' ' then
+            exit(false);
+
+        TimestampText := CopyStr(ErrorMessage, 1, MappingErrorPosition - 2);
+        exit(Evaluate(ErrorTime, TimestampText));
+    end;
+
+    local procedure AddUniqueIssue(var MissingIssues: List of [Text]; Issue: Text)
+    begin
+        if not MissingIssues.Contains(Issue) then
+            MissingIssues.Add(Issue);
     end;
 
     /// <summary> 

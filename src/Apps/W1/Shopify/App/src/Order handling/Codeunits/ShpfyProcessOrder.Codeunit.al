@@ -28,6 +28,7 @@ codeunit 30166 "Shpfy Process Order"
         ShopifyShop: Record "Shpfy Shop";
         OrderEvents: Codeunit "Shpfy Order Events";
         LastCreatedDocumentId: Guid;
+        MappingExecutionMode: Text[20];
 
     trigger OnRun()
     var
@@ -35,12 +36,16 @@ codeunit 30166 "Shpfy Process Order"
         OrderHeader: Record "Shpfy Order Header";
         ReleaseSalesDocument: Codeunit "Release Sales Document";
         OrderMapping: Codeunit "Shpfy Order Mapping";
-        MappingErr: Label 'Not everything can be mapped.';
+        MissingIssues: List of [Text];
     begin
         OrderHeader.Get(Rec."Shopify Order Id");
         OrderEvents.OnBeforeProcessSalesDocument(OrderHeader);
-        if not OrderMapping.DoMapping(OrderHeader) then
-            Error(MappingErr);
+        if CurrentClientType() = ClientType::Background then
+            MappingExecutionMode := 'Background';
+        if MappingExecutionMode = '' then
+            MappingExecutionMode := 'Manual';
+        if not OrderMapping.DoMappingWithIssues(OrderHeader, MissingIssues, MappingExecutionMode) then
+            Error(OrderMapping.GetMappingErrorMessage(MissingIssues));
 
         ShopifyShop.Get(OrderHeader."Shop Code");
         CreateHeaderFromShopifyOrder(SalesHeader, OrderHeader);
@@ -56,6 +61,11 @@ codeunit 30166 "Shpfy Process Order"
         OrderEvents.OnAfterProcessSalesDocument(SalesHeader, OrderHeader);
 
         Rec.Get(OrderHeader."Shopify Order Id");
+    end;
+
+    internal procedure SetMappingExecutionMode(ExecutionMode: Text[20])
+    begin
+        MappingExecutionMode := ExecutionMode;
     end;
 
     /// <summary> 

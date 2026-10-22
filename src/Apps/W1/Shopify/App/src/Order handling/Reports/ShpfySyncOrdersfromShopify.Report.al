@@ -51,6 +51,7 @@ report 30104 "Shpfy Sync Orders from Shopify"
                     OrderHeader: Record "Shpfy Order Header";
                     ImportOrder: Codeunit "Shpfy Import Order";
                     OrderMapping: Codeunit "Shpfy Order Mapping";
+                    MissingIssues: List of [Text];
                 begin
                     ClearLastError();
                     Commit();
@@ -68,9 +69,11 @@ report 30104 "Shpfy Sync Orders from Shopify"
                         if OrderHeader.Get(OrdersToImport.Id) then begin
                             OrdersToImport.Delete();
                             Commit();
-                            if OrderMapping.DoMapping(OrderHeader) and (OrdersToImport."Import Action" = OrdersToImport."Import Action"::New) then
-                                if Shop."Auto Create Orders" then
+                            if OrderMapping.DoMappingWithIssues(OrderHeader, MissingIssues, 'Automatic') then begin
+                                if (OrdersToImport."Import Action" = OrdersToImport."Import Action"::New) and Shop."Auto Create Orders" then
                                     CreateSalesDocumentForOrders(OrderHeader);
+                            end else
+                                OrderMapping.PersistMappingError(OrderHeader, MissingIssues);
                         end;
 
                     if GuiAllowed then begin
@@ -125,6 +128,7 @@ report 30104 "Shpfy Sync Orders from Shopify"
         if not ShopifyOrderHeader.Processed then begin
             Commit();
             ClearLastError();
+            ProcessOrder.SetMappingExecutionMode('Automatic');
             if not ProcessOrder.Run(ShopifyOrderHeader) then begin
                 SelectLatestVersion();
                 ShopifyOrderHeader.Get(ShopifyOrderHeader."Shopify Order Id");

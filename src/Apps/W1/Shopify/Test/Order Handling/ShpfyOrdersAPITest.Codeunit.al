@@ -16,6 +16,7 @@ using Microsoft.Sales.Customer;
 using Microsoft.Sales.Document;
 using Microsoft.Sales.Setup;
 using System.TestLibraries.Utilities;
+using System.Threading;
 
 codeunit 139608 "Shpfy Orders API Test"
 {
@@ -323,6 +324,122 @@ codeunit 139608 "Shpfy Orders API Test"
 
         // [THEN] Company Location must be mapped correctly
         CompanyLocation.Get(OrderHeader."Company Location Id");
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure Completeness_AllApplicableGapsAndFallback()
+    var
+        TempCases: Record "Shpfy Order Header" temporary;
+        ExpectedIssues: Dictionary of [BigInteger, Text];
+        ActualIssues: Dictionary of [BigInteger, Text];
+        MappingResults: Dictionary of [BigInteger, Boolean];
+    begin
+        // [SCENARIO] Mapping collects every unresolved customer, item and required account gap after applying existing fallback rules.
+        // Resolved values are excluded, each unmapped ordinary or exchange item retains its Shopify line identity,
+        // and mapping succeeds only when no required value remains missing.
+        this.Initialize();
+
+        // [GIVEN] Five cases cover customer fallback, inapplicable accounts and combined gaps exceeding the persisted error capacity.
+        this.PrepareCompletenessCases(TempCases, ExpectedIssues);
+
+        // [WHEN] Mapping runs for each prepared order.
+        this.CollectCompletenessResults(TempCases, ActualIssues, MappingResults);
+
+        // [THEN] The collected issues and persisted customer mappings match the expected outcomes.
+        this.VerifyCompletenessCases(TempCases, ExpectedIssues, ActualIssues, MappingResults);
+    end;
+
+    [Test]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure Completeness_ExecutionPathsAndErrorOwnership()
+    var
+        Cases: Dictionary of [Text, BigInteger];
+        Outcomes: JsonArray;
+    begin
+        // [SCENARIO] Find Mappings updates and clears only mapping-owned errors, leaving unrelated errors untouched.
+        // Correcting only the customers retains the error flag and the remaining account diagnostics until all mappings are complete.
+        this.Initialize();
+
+        // [GIVEN] Two incomplete orders with a mapping-owned error and an unrelated active error.
+        this.PrepareMappingEntryPaths(Cases);
+
+        // [WHEN] Find Mappings runs before correction, after customer correction and after complete correction.
+        this.ExerciseMappingEntryPaths(Cases, Outcomes);
+
+        // [THEN] Only the mapping-owned error is updated and cleared; neither order has a sales document.
+        this.VerifyMappingOutcomes(Outcomes, 5);
+    end;
+
+    [Test]
+    [HandlerFunctions('OrdersAPIHttpHandler')]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure Completeness_AutomaticUpdateFailurePersistsMappingError()
+    var
+        OrderId: BigInteger;
+    begin
+        // [SCENARIO] Importing an existing order as Update persists all unresolved mapping details even when automatic document creation is enabled.
+        // The order remains unprocessed, no sales document or document link is created, and the import queue entry is removed.
+        this.Initialize();
+
+        // [GIVEN] An incomplete order staged for Update in a shop with automatic order creation enabled.
+        OrderId := this.PrepareAutomaticUpdateOrder();
+
+        // [WHEN] The synchronization report imports the updated order and checks its mappings.
+        this.RunMappingImport();
+
+        // [THEN] The timestamped mapping error and error flag are persisted without processing the order or creating a document.
+        this.VerifyAutomaticUpdateError(OrderId, this.ExpectedMappingDetails(true), true, false, false);
+    end;
+
+    [Test]
+    [HandlerFunctions('OrdersAPIHttpHandler')]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure Completeness_AutomaticUpdatePreservesOrderStateError()
+    var
+        ImportOrder: JsonObject;
+        ImportLines: JsonArray;
+        OrderId: BigInteger;
+        MappingConflictLbl: Label 'Processed-order conflict. Preserve the entire original diagnostic.';
+    begin
+        // [SCENARIO] Updating an already processed order with incomplete mappings must not replace an active order-state conflict.
+        // Both error flags and the original conflict message remain unchanged, and no sales order or invoice number is assigned.
+        this.Initialize();
+
+        // [GIVEN] An imported order marked processed with an active order-state conflict and unresolved mappings.
+        OrderId := this.PrepareProcessedOrderStateError(ImportOrder, ImportLines);
+
+        // [WHEN] The same order is staged as Update and imported again.
+        this.RunMappingUpdate(OrderId, ImportOrder, ImportLines);
+
+        // [THEN] Mapping failure preserves the original conflict and both flags without assigning document numbers.
+        this.VerifyAutomaticUpdateError(OrderId, MappingConflictLbl, false, true, true);
+    end;
+
+    [Test]
+    [HandlerFunctions('OrdersAPIHttpHandler,MappingConfirmHandler')]
+    [TransactionModel(TransactionModel::AutoCommit)]
+    procedure Completeness_RetryAfterMappingCorrection()
+    var
+        JobQueueEntry: Record "Job Queue Entry";
+        Outcomes: JsonArray;
+        OrderId: BigInteger;
+        ImportOrder: JsonObject;
+        ImportLines: JsonArray;
+    begin
+        // [SCENARIO] Repeated scheduled, manual and batch attempts remain retryable while mappings are incomplete.
+        // Each failure leaves the order unprocessed without a document; correcting the mappings allows one document to be created.
+        // Further processing does not create duplicates.
+        this.Initialize();
+
+        // [GIVEN] An incomplete staged order and a job queue report entry with mocked Shopify responses.
+        OrderId := this.PrepareMappingRetry(JobQueueEntry, ImportOrder, ImportLines);
+
+        // [WHEN] Scheduled report, manual and batch processing repeat before and after mapping correction.
+        this.ExerciseMappingRetries(OrderId, JobQueueEntry, ImportOrder, ImportLines, Outcomes);
+
+        // [THEN] Incomplete attempts retain their mapping error, and corrected attempts create one document without duplicates.
+        this.VerifyMappingOutcomes(Outcomes, 8);
     end;
 
     [Test]
@@ -1766,6 +1883,772 @@ codeunit 139608 "Shpfy Orders API Test"
         Shop.Modify(false);
     end;
 
+    local procedure PrepareCompletenessCases(var TempCases: Record "Shpfy Order Header" temporary; var ExpectedIssues: Dictionary of [BigInteger, Text])
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        OrderLine: Record "Shpfy Order Line";
+        CustomerTemplate: Record "Shpfy Customer Template";
+        Customer: Record Customer;
+        OrderId: BigInteger;
+        Index: Integer;
+        IssueText: Text;
+        MappingSellToTok: Label 'SellToCustomer', Locked = true;
+        MappingBillToTok: Label 'BillToCustomer', Locked = true;
+        MappingTipTok: Label 'TipAccount', Locked = true;
+        MappingGiftCardTok: Label 'GiftCardAccount', Locked = true;
+        MappingItemTok: Label 'ItemLine:%1', Locked = true, Comment = '%1 = Shopify line id';
+    begin
+        this.AddCompletenessCase(TempCases, ExpectedIssues, false, true, false, false);
+
+        OrderId := this.AddCompletenessCase(TempCases, ExpectedIssues, false, false, false, false);
+        OrderLine.SetRange("Shopify Order Id", OrderId);
+        OrderLine.DeleteAll(false);
+        OrderLine.Reset();
+        this.Shop."Tip Account" := '';
+        this.Shop."Sold Gift Card Account" := '';
+        this.Shop.Modify(false);
+
+        Customer := this.InitializeTest.GetDummyCustomer();
+        OrderId := this.AddCompletenessCase(TempCases, ExpectedIssues, true, true, false, false);
+        this.Shop."Default Customer No." := Customer."No.";
+        this.Shop.Modify(false);
+        ExpectedIssues.Set(OrderId, '');
+
+        OrderId := this.AddCompletenessCase(TempCases, ExpectedIssues, true, true, false, false);
+        OrderHeader.Get(OrderId);
+        CustomerTemplate."Shop Code" := this.Shop.Code;
+        CustomerTemplate."Country/Region Code" := OrderHeader."Ship-to Country/Region Code";
+        CustomerTemplate."Default Customer No." := Customer."No.";
+        CustomerTemplate.Insert(false);
+        ExpectedIssues.Set(OrderId, '');
+
+        OrderId := this.AddCompletenessCase(TempCases, ExpectedIssues, true, true, true, true);
+        IssueText := MappingSellToTok + '|' + MappingBillToTok + '|';
+        for Index := 1 to 160 do begin
+            this.CreateUnmappedItemLine(OrderId, OrderId * 1000 + Index, Index = 160);
+            IssueText += StrSubstNo(MappingItemTok, Format(OrderId * 1000 + Index)) + '|';
+        end;
+        OrderLine.Get(OrderId, OrderId * 10 + 3);
+        OrderLine.Rename(OrderId, OrderId * 1000 + 161);
+        OrderLine.Get(OrderId, OrderId * 10 + 4);
+        OrderLine.Rename(OrderId, OrderId * 1000 + 162);
+        OrderLine.Init();
+        OrderLine."Shopify Order Id" := OrderId;
+        OrderLine."Line Id" := OrderId * 1000 + 163;
+        OrderLine.Tip := true;
+        OrderLine.Insert(false);
+        OrderLine.Init();
+        OrderLine."Shopify Order Id" := OrderId;
+        OrderLine."Line Id" := OrderId * 1000 + 164;
+        OrderLine."Gift Card" := true;
+        OrderLine.Insert(false);
+        ExpectedIssues.Set(OrderId, IssueText + MappingTipTok + '|' + MappingGiftCardTok + '|');
+    end;
+
+    local procedure AddCompletenessCase(var TempCases: Record "Shpfy Order Header" temporary; var ExpectedIssues: Dictionary of [BigInteger, Text]; MissingSellTo: Boolean; MissingBillTo: Boolean; MissingTip: Boolean; MissingGiftCard: Boolean): BigInteger
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        Customer: Record Customer;
+        IssueText: Text;
+        MappingSellToTok: Label 'SellToCustomer', Locked = true;
+        MappingBillToTok: Label 'BillToCustomer', Locked = true;
+        MappingTipTok: Label 'TipAccount', Locked = true;
+        MappingGiftCardTok: Label 'GiftCardAccount', Locked = true;
+    begin
+        this.Shop := this.CreateIncompleteMappingShop();
+        this.Shop.Code := CopyStr(this.Any.AlphabeticText(20), 1, MaxStrLen(this.Shop.Code));
+        this.Shop.Insert(false);
+        this.CreateIncompleteMappingOrder(OrderHeader);
+        Customer := this.InitializeTest.GetDummyCustomer();
+        if not MissingSellTo then
+            OrderHeader."Sell-to Customer No." := Customer."No.";
+        if not MissingBillTo then
+            OrderHeader."Bill-to Customer No." := Customer."No.";
+        OrderHeader.Modify(false);
+
+        if MissingSellTo then
+            IssueText += MappingSellToTok + '|';
+        if MissingBillTo and MissingSellTo then
+            IssueText += MappingBillToTok + '|';
+        if MissingTip then
+            IssueText += MappingTipTok + '|'
+        else
+            this.Shop."Tip Account" := this.Shop."Refund Account";
+        if MissingGiftCard then
+            IssueText += MappingGiftCardTok + '|'
+        else
+            this.Shop."Sold Gift Card Account" := this.Shop."Refund Account";
+        this.Shop.Modify(false);
+
+        TempCases := OrderHeader;
+        TempCases.Insert();
+        ExpectedIssues.Add(OrderHeader."Shopify Order Id", IssueText);
+        exit(OrderHeader."Shopify Order Id");
+    end;
+
+    local procedure CollectCompletenessResults(var TempCases: Record "Shpfy Order Header" temporary; var ActualIssues: Dictionary of [BigInteger, Text]; var MappingResults: Dictionary of [BigInteger, Boolean])
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        OrderMapping: Codeunit "Shpfy Order Mapping";
+        Issues: List of [Text];
+        Actual: Text;
+        Issue: Text;
+    begin
+        if TempCases.FindSet() then
+            repeat
+                OrderHeader.Get(TempCases."Shopify Order Id");
+                MappingResults.Add(OrderHeader."Shopify Order Id", OrderMapping.DoMappingWithIssues(OrderHeader, Issues, 'Mapping'));
+                Actual := '';
+                foreach Issue in Issues do
+                    Actual += Issue + '|';
+                ActualIssues.Add(OrderHeader."Shopify Order Id", Actual);
+            until TempCases.Next() = 0;
+    end;
+
+    local procedure VerifyCompletenessCases(var TempCases: Record "Shpfy Order Header" temporary; ExpectedIssues: Dictionary of [BigInteger, Text]; ActualIssues: Dictionary of [BigInteger, Text]; MappingResults: Dictionary of [BigInteger, Boolean])
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        CustomerTemplate: Record "Shpfy Customer Template";
+        OrderMapping: Codeunit "Shpfy Order Mapping";
+        Issues: List of [Text];
+        OrderId: BigInteger;
+        Expected: Text;
+        Actual: Text;
+        LongestResult: Integer;
+        MappingIssuesMismatchErr: Label 'Order %1 must retain every unresolved issue in discovery order.', Comment = '%1 = Shopify order id';
+        MappingResultMismatchErr: Label 'Order %1 mapping result must agree with its unresolved issues.', Comment = '%1 = Shopify order id';
+        MappingCustomerMismatchErr: Label 'Order %1 must retain the customer selected by the existing mapping rules.', Comment = '%1 = Shopify order id';
+        MappingCasesMismatchErr: Label 'Every prepared mapping case must be executed.';
+        MappingItemWordingErr: Label 'Internal Shopify line tokens must not be exposed before item wording is approved.';
+        MappingCollectionSizeErr: Label 'The collected issue list must exceed the existing error capacity without dropping later issues.';
+    begin
+        this.LibraryAssert.AreEqual(5, TempCases.Count(), MappingCasesMismatchErr);
+        this.LibraryAssert.AreEqual(TempCases.Count(), ExpectedIssues.Count(), MappingCasesMismatchErr);
+        this.LibraryAssert.AreEqual(TempCases.Count(), ActualIssues.Count(), MappingCasesMismatchErr);
+        this.LibraryAssert.AreEqual(TempCases.Count(), MappingResults.Count(), MappingCasesMismatchErr);
+        if TempCases.FindSet() then
+            repeat
+                OrderId := TempCases."Shopify Order Id";
+                OrderHeader.Get(OrderId);
+                this.Shop.Get(OrderHeader."Shop Code");
+                Actual := ActualIssues.Get(OrderId);
+                Expected := ExpectedIssues.Get(OrderId);
+                this.LibraryAssert.AreEqual(Expected, Actual, StrSubstNo(MappingIssuesMismatchErr, OrderId));
+                this.LibraryAssert.AreEqual(Expected = '', MappingResults.Get(OrderId), StrSubstNo(MappingResultMismatchErr, OrderId));
+                if StrLen(Actual) > LongestResult then
+                    LongestResult := StrLen(Actual);
+                if TempCases."Sell-to Customer No." <> '' then
+                    this.LibraryAssert.AreEqual(TempCases."Sell-to Customer No.", OrderHeader."Sell-to Customer No.", StrSubstNo(MappingCustomerMismatchErr, OrderId));
+                if TempCases."Bill-to Customer No." <> '' then
+                    this.LibraryAssert.AreEqual(TempCases."Bill-to Customer No.", OrderHeader."Bill-to Customer No.", StrSubstNo(MappingCustomerMismatchErr, OrderId));
+                if (TempCases."Bill-to Customer No." = '') and (TempCases."Sell-to Customer No." <> '') then
+                    this.LibraryAssert.AreEqual(TempCases."Sell-to Customer No.", OrderHeader."Bill-to Customer No.", StrSubstNo(MappingCustomerMismatchErr, OrderId));
+                if this.Shop."Default Customer No." <> '' then begin
+                    this.LibraryAssert.AreEqual(this.Shop."Default Customer No.", OrderHeader."Sell-to Customer No.", StrSubstNo(MappingCustomerMismatchErr, OrderId));
+                    this.LibraryAssert.AreEqual(this.Shop."Default Customer No.", OrderHeader."Bill-to Customer No.", StrSubstNo(MappingCustomerMismatchErr, OrderId));
+                end;
+                if CustomerTemplate.Get(this.Shop.Code, OrderHeader."Ship-to Country/Region Code") then begin
+                    this.LibraryAssert.AreEqual(CustomerTemplate."Default Customer No.", OrderHeader."Sell-to Customer No.", StrSubstNo(MappingCustomerMismatchErr, OrderId));
+                    this.LibraryAssert.AreEqual(CustomerTemplate."Default Customer No.", OrderHeader."Bill-to Customer No.", StrSubstNo(MappingCustomerMismatchErr, OrderId));
+                end;
+                Issues := Actual.Split('|');
+                this.LibraryAssert.IsFalse(OrderMapping.GetMappingErrorMessage(Issues).Contains('ItemLine:'), MappingItemWordingErr);
+            until TempCases.Next() = 0;
+        this.LibraryAssert.IsTrue(LongestResult > MaxStrLen(OrderHeader."Error Message"), MappingCollectionSizeErr);
+    end;
+
+    local procedure PrepareMappingEntryPaths(var Cases: Dictionary of [Text, BigInteger])
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        CaseName: Text;
+        CaseNames: List of [Text];
+        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
+        MappingUnrelatedLbl: Label 'Unrelated active error. Not everything can be mapped. Preserve the entire original diagnostic.';
+    begin
+        this.Shop := this.CreateIncompleteMappingShop();
+        CaseNames.Add('Mapping');
+        CaseNames.Add('Unrelated');
+        foreach CaseName in CaseNames do begin
+            this.Shop.Code := CopyStr(this.Any.AlphabeticText(20), 1, MaxStrLen(this.Shop.Code));
+            this.Shop.Insert(false);
+            this.CreateIncompleteMappingOrder(OrderHeader);
+            this.CreateUnmappedItemLine(OrderHeader."Shopify Order Id", OrderHeader."Shopify Order Id" * 10 + 1, false);
+            this.CreateUnmappedItemLine(OrderHeader."Shopify Order Id", OrderHeader."Shopify Order Id" * 10 + 5, true);
+            case CaseName of
+                'Mapping':
+                    this.SetOrderError(OrderHeader, MappingPrefixTok + ' ' + this.LibraryRandom.RandText(30));
+                'Unrelated':
+                    this.SetOrderError(OrderHeader, MappingUnrelatedLbl);
+            end;
+            Cases.Add(CaseName, OrderHeader."Shopify Order Id");
+        end;
+    end;
+
+    local procedure ExerciseMappingEntryPaths(Cases: Dictionary of [Text, BigInteger]; var Outcomes: JsonArray)
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        Customer: Record Customer;
+        CaseName: Text;
+        ExpectedError: Text;
+        RemainingError: TextBuilder;
+        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
+        MappingTipDetailLbl: Label 'Tip Account must have a value in Shopify Shop.';
+        MappingGiftCardDetailLbl: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
+        MappingUnrelatedLbl: Label 'Unrelated active error. Not everything can be mapped. Preserve the entire original diagnostic.';
+    begin
+        foreach CaseName in Cases.Keys() do begin
+            this.RunMappingPath(Cases.Get(CaseName), CaseName);
+            ExpectedError := this.ExpectedMappingDetails(true);
+            if CaseName = 'Unrelated' then
+                ExpectedError := MappingUnrelatedLbl;
+            this.CaptureMappingOutcome(Cases.Get(CaseName), ExpectedError, CaseName = 'Mapping', false, false, 0, Outcomes);
+        end;
+
+        OrderHeader.Get(Cases.Get('Mapping'));
+        Customer := this.InitializeTest.GetDummyCustomer();
+        OrderHeader."Sell-to Customer No." := Customer."No.";
+        OrderHeader."Bill-to Customer No." := Customer."No.";
+        OrderHeader.Modify(false);
+        this.RunMappingPath(OrderHeader."Shopify Order Id", 'Mapping');
+        RemainingError.AppendLine(MappingPrefixTok);
+        RemainingError.AppendLine(MappingTipDetailLbl);
+        RemainingError.AppendLine(MappingGiftCardDetailLbl);
+        this.CaptureMappingOutcome(OrderHeader."Shopify Order Id", RemainingError.ToText(), true, false, false, 0, Outcomes);
+
+        foreach CaseName in Cases.Keys() do begin
+            this.CorrectMappingOrder(Cases.Get(CaseName));
+            this.RunMappingPath(Cases.Get(CaseName), CaseName);
+            ExpectedError := '';
+            if CaseName = 'Unrelated' then
+                ExpectedError := MappingUnrelatedLbl;
+            this.CaptureMappingOutcome(Cases.Get(CaseName), ExpectedError, false, false, false, 0, Outcomes);
+        end;
+    end;
+
+    local procedure RunMappingPath(OrderId: BigInteger; Path: Text)
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        ProcessOrders: Codeunit "Shpfy Process Orders";
+        OrderPage: TestPage "Shpfy Order";
+    begin
+        OrderHeader.Get(OrderId);
+        this.Shop.Get(OrderHeader."Shop Code");
+        Commit();
+        if Path = 'Batch' then begin
+            OrderHeader.SetRange("Shop Code", this.Shop.Code);
+            ProcessOrders.SetShop(this.Shop);
+            ProcessOrders.ProcessShopifyOrders(OrderHeader);
+        end else begin
+            OrderPage.OpenEdit();
+            OrderPage.GoToRecord(OrderHeader);
+            if Path = 'Manual' then
+                OrderPage.CreateSalesDocument.Invoke()
+            else
+                OrderPage.FindMappings.Invoke();
+            OrderPage.Close();
+        end;
+    end;
+
+    local procedure PrepareAutomaticUpdateOrder(): BigInteger
+    var
+        OrdersToImport: Record "Shpfy Orders to Import";
+        OrderId: BigInteger;
+        ImportOrder: JsonObject;
+        ImportLines: JsonArray;
+        MappingStagedOrderErr: Label 'The incomplete order must be staged before its import action can be updated.';
+    begin
+        this.Shop := this.CreateIncompleteMappingShop();
+        this.SetAutomaticOrderCreation(true);
+        OrderId := this.PrepareIncompleteOrderImport(true, ImportOrder, ImportLines);
+        OrdersToImport.SetRange("Shop Id", this.Shop."Shop Id");
+        OrdersToImport.SetRange(Id, OrderId);
+        this.LibraryAssert.IsTrue(OrdersToImport.FindFirst(), MappingStagedOrderErr);
+        OrdersToImport."Import Action" := OrdersToImport."Import Action"::Update;
+        OrdersToImport.Modify(false);
+        exit(OrderId);
+    end;
+
+    local procedure VerifyAutomaticUpdateError(OrderId: BigInteger; ExpectedError: Text; Timestamped: Boolean; ExpectedOrderStateError: Boolean; ExpectedProcessed: Boolean)
+    var
+        Outcomes: JsonArray;
+    begin
+        this.CaptureMappingOutcome(OrderId, ExpectedError, Timestamped, ExpectedOrderStateError, ExpectedProcessed, 0, Outcomes);
+        this.VerifyMappingOutcomes(Outcomes, 1);
+    end;
+
+    local procedure PrepareProcessedOrderStateError(var ImportOrder: JsonObject; var ImportLines: JsonArray) OrderId: BigInteger
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        MappingConflictLbl: Label 'Processed-order conflict. Preserve the entire original diagnostic.';
+    begin
+        this.Shop := this.CreateIncompleteMappingShop();
+        this.SetAutomaticOrderCreation(true);
+        OrderId := this.PrepareIncompleteOrderImport(true, ImportOrder, ImportLines);
+        this.RunMappingImport();
+        OrderHeader.Get(OrderId);
+        OrderHeader.Processed := true;
+        OrderHeader."Has Order State Error" := true;
+        OrderHeader."Has Error" := true;
+        OrderHeader."Error Message" := MappingConflictLbl;
+        OrderHeader.Modify(false);
+        exit(OrderId);
+    end;
+
+    local procedure RunMappingUpdate(OrderId: BigInteger; ImportOrder: JsonObject; ImportLines: JsonArray)
+    var
+        OrdersToImport: Record "Shpfy Orders to Import";
+        MappingStagedOrderErr: Label 'The incomplete order must be staged before its import action can be updated.';
+    begin
+        this.RestageMappingOrder(OrderId, ImportOrder, ImportLines);
+        OrdersToImport.SetRange("Shop Id", this.Shop."Shop Id");
+        OrdersToImport.SetRange(Id, OrderId);
+        this.LibraryAssert.IsTrue(OrdersToImport.FindFirst(), MappingStagedOrderErr);
+        OrdersToImport."Import Action" := OrdersToImport."Import Action"::Update;
+        OrdersToImport.Modify(false);
+        this.RunMappingImport();
+    end;
+
+    local procedure CorrectMappingOrder(OrderId: BigInteger)
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        OrderLine: Record "Shpfy Order Line";
+        Variant: Record "Shpfy Variant";
+        Item: Record Item;
+        Customer: Record Customer;
+    begin
+        Customer := this.InitializeTest.GetDummyCustomer();
+        OrderHeader.Get(OrderId);
+        OrderHeader."Sell-to Customer No." := Customer."No.";
+        OrderHeader."Bill-to Customer No." := Customer."No.";
+        OrderHeader."Sell-to Country/Region Code" := Customer."Country/Region Code";
+        OrderHeader."Bill-to Country/Region Code" := Customer."Country/Region Code";
+        OrderHeader."Ship-to Country/Region Code" := Customer."Country/Region Code";
+        OrderHeader.Modify(false);
+        this.Shop.Get(OrderHeader."Shop Code");
+        this.Shop."Tip Account" := this.Shop."Refund Account";
+        this.Shop."Sold Gift Card Account" := this.Shop."Refund Account";
+        this.Shop."Auto Release Sales Orders" := false;
+        this.Shop."Create Invoices From Orders" := false;
+        this.Shop.Modify(false);
+        Item := this.InitializeTest.GetDummyItem();
+        OrderLine.SetRange("Shopify Order Id", OrderId);
+        OrderLine.SetRange(Tip, false);
+        OrderLine.SetRange("Gift Card", false);
+        if OrderLine.FindSet() then
+            repeat
+                Variant.Get(OrderLine."Shopify Variant Id");
+                Variant."Item SystemId" := Item.SystemId;
+                Variant.Modify(false);
+            until OrderLine.Next() = 0;
+        Commit();
+    end;
+
+    local procedure ExpectedMappingDetails(IncludeAccounts: Boolean): Text
+    var
+        Builder: TextBuilder;
+        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
+        MappingTipDetailLbl: Label 'Tip Account must have a value in Shopify Shop.';
+        MappingGiftCardDetailLbl: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
+        MappingSellToDetailLbl: Label 'Sell-to Customer No. is missing.';
+        MappingBillToDetailLbl: Label 'Bill-to Customer No. is missing.';
+    begin
+        Builder.AppendLine(MappingPrefixTok);
+        Builder.AppendLine(MappingSellToDetailLbl);
+        Builder.AppendLine(MappingBillToDetailLbl);
+        if IncludeAccounts then begin
+            Builder.AppendLine(MappingTipDetailLbl);
+            Builder.AppendLine(MappingGiftCardDetailLbl);
+        end;
+        exit(Builder.ToText());
+    end;
+
+    local procedure ExpectedProcessingMappingDetails(IncludeAccounts: Boolean): Text
+    var
+        LineBreak: Text[2];
+    begin
+        // GetLastErrorText preserves the runtime's backslash line separators.
+        LineBreak := '  ';
+        LineBreak[1] := 13;
+        LineBreak[2] := 10;
+        exit(this.ExpectedMappingDetails(IncludeAccounts).Replace(LineBreak, '\'));
+    end;
+
+    local procedure CaptureMappingOutcome(OrderId: BigInteger; ExpectedError: Text; Timestamped: Boolean; ExpectedOrderStateError: Boolean; ExpectedProcessed: Boolean; ExpectedDocumentCount: Integer; var Outcomes: JsonArray)
+    var
+        OrderHeader: Record "Shpfy Order Header";
+        SalesHeader: Record "Sales Header";
+        DocumentLink: Record "Shpfy Doc. Link To Doc.";
+        OrdersToImport: Record "Shpfy Orders to Import";
+        Outcome: JsonObject;
+    begin
+        OrderHeader.Get(OrderId);
+        SalesHeader.SetRange("Shpfy Order Id", OrderId);
+        DocumentLink.SetRange("Shopify Document Type", DocumentLink."Shopify Document Type"::"Shopify Shop Order");
+        DocumentLink.SetRange("Shopify Document Id", OrderId);
+        OrdersToImport.SetRange(Id, OrderId);
+        Outcome.Add('orderId', OrderId);
+        Outcome.Add('error', OrderHeader."Error Message");
+        Outcome.Add('hasError', OrderHeader."Has Error");
+        Outcome.Add('hasOrderStateError', OrderHeader."Has Order State Error");
+        Outcome.Add('processed', OrderHeader.Processed);
+        Outcome.Add('documents', SalesHeader.Count());
+        Outcome.Add('links', DocumentLink.Count());
+        Outcome.Add('staged', OrdersToImport.Count());
+        Outcome.Add('salesOrderNo', OrderHeader."Sales Order No.");
+        Outcome.Add('salesInvoiceNo', OrderHeader."Sales Invoice No.");
+        Outcome.Add('expectedError', ExpectedError);
+        Outcome.Add('timestamped', Timestamped);
+        Outcome.Add('expectedOrderStateError', ExpectedOrderStateError);
+        Outcome.Add('expectedProcessed', ExpectedProcessed);
+        Outcome.Add('expectedDocuments', ExpectedDocumentCount);
+        Outcomes.Add(Outcome);
+    end;
+
+    local procedure VerifyMappingOutcomes(Outcomes: JsonArray; ExpectedCount: Integer)
+    var
+        OutcomeToken: JsonToken;
+        Outcome: JsonObject;
+        ExpectedError: Text;
+        ActualError: Text;
+        ErrorMessage: Text;
+        ErrorTime: Time;
+        MappingErrorFlagErr: Label 'The persisted error flag must match the execution outcome.';
+        MappingErrorMessageErr: Label 'Order %1 must retain the whole owned error. Expected: <%2>. Actual: <%3>.', Comment = '%1 = Shopify order id, %2 = expected error text, %3 = actual error text';
+        MappingTimestampErr: Label 'The mapping error must start with a session-formatted time.';
+        MappingProcessedErr: Label 'Only a successfully corrected order may be marked processed.';
+        MappingDocumentCountErr: Label 'An incomplete order must have no sales document; a corrected order must have exactly one.';
+        MappingDocumentLinkErr: Label 'Failed processing must not leave sales document numbers or document links.';
+        MappingOutcomeCountErr: Label 'Every execution path and recovery attempt must be observed.';
+        MappingRetryQueueErr: Label 'A successfully imported order must leave the staging queue even when mapping is incomplete.';
+        MappingConflictPreservationErr: Label 'An active processed-order conflict must retain its order-state error flag.';
+    begin
+        this.HttpResponses.AssertEmpty();
+        this.LibraryAssert.AreEqual(ExpectedCount, Outcomes.Count(), MappingOutcomeCountErr);
+        foreach OutcomeToken in Outcomes do begin
+            Outcome := OutcomeToken.AsObject();
+            ExpectedError := Outcome.GetText('expectedError');
+            ActualError := Outcome.GetText('error');
+            ErrorMessage := StrSubstNo(MappingErrorMessageErr, Outcome.GetBigInteger('orderId'), ExpectedError, ActualError);
+            this.LibraryAssert.AreEqual(ExpectedError <> '', Outcome.GetBoolean('hasError'), MappingErrorFlagErr + ' ' + ErrorMessage);
+            this.LibraryAssert.AreEqual(Outcome.GetBoolean('expectedOrderStateError'), Outcome.GetBoolean('hasOrderStateError'), MappingConflictPreservationErr);
+            if Outcome.GetBoolean('timestamped') then begin
+                this.LibraryAssert.IsTrue(ActualError.EndsWith(ExpectedError), ErrorMessage);
+                this.LibraryAssert.IsTrue(StrLen(ActualError) > StrLen(ExpectedError), ErrorMessage);
+                this.LibraryAssert.IsTrue(Evaluate(ErrorTime, CopyStr(ActualError, 1, StrLen(ActualError) - StrLen(ExpectedError) - 1)), MappingTimestampErr);
+            end else
+                this.LibraryAssert.AreEqual(ExpectedError, ActualError, ErrorMessage);
+            this.LibraryAssert.AreEqual(Outcome.GetBoolean('expectedProcessed'), Outcome.GetBoolean('processed'), MappingProcessedErr);
+            this.LibraryAssert.AreEqual(Outcome.GetInteger('expectedDocuments'), Outcome.GetInteger('documents'), MappingDocumentCountErr);
+            this.LibraryAssert.AreEqual(Outcome.GetInteger('expectedDocuments'), Outcome.GetInteger('links'), MappingDocumentLinkErr);
+            this.LibraryAssert.AreEqual(0, Outcome.GetInteger('staged'), MappingRetryQueueErr);
+            if Outcome.GetInteger('expectedDocuments') = 0 then begin
+                this.LibraryAssert.AreEqual('', Outcome.GetText('salesOrderNo'), MappingDocumentLinkErr);
+                this.LibraryAssert.AreEqual('', Outcome.GetText('salesInvoiceNo'), MappingDocumentLinkErr);
+            end;
+        end;
+    end;
+
+    local procedure RunMappingImport()
+    var
+        ShopFilter: Record "Shpfy Shop";
+        SyncOrders: Report "Shpfy Sync Orders from Shopify";
+    begin
+        ShopFilter.SetRange(Code, this.Shop.Code);
+        SyncOrders.SetTableView(ShopFilter);
+        SyncOrders.UseRequestPage(false);
+        Commit();
+        SyncOrders.Run();
+    end;
+
+    local procedure PrepareMappingRetry(var JobQueueEntry: Record "Job Queue Entry"; var ImportOrder: JsonObject; var ImportLines: JsonArray): BigInteger
+    var
+        OrderId: BigInteger;
+        ShopFilter: Record "Shpfy Shop";
+        MappingJobParametersTok: Label '<?xml version="1.0" standalone="yes"?><ReportParameters name="Sync Orders from Shopify" id="30104"><DataItems><DataItem name="Shop">%1</DataItem><DataItem name="OrdersToImport">VERSION(1) SORTING(Field1)</DataItem></DataItems></ReportParameters>', Locked = true, Comment = '%1 = Shop record view';
+    begin
+        this.Shop := this.CreateIncompleteMappingShop();
+        this.SetAutomaticOrderCreation(true);
+        OrderId := this.PrepareIncompleteOrderImport(true, ImportOrder, ImportLines);
+        JobQueueEntry.ID := CreateGuid();
+        JobQueueEntry."User ID" := CopyStr(UserId(), 1, MaxStrLen(JobQueueEntry."User ID"));
+        JobQueueEntry."Object Type to Run" := JobQueueEntry."Object Type to Run"::Report;
+        JobQueueEntry."Object ID to Run" := Report::"Shpfy Sync Orders from Shopify";
+        JobQueueEntry."Report Output Type" := JobQueueEntry."Report Output Type"::"None (Processing only)";
+        JobQueueEntry."Notify On Success" := true;
+        JobQueueEntry.Insert(false);
+        ShopFilter.SetRange(Code, this.Shop.Code);
+        JobQueueEntry.SetXmlContent(StrSubstNo(MappingJobParametersTok, ShopFilter.GetView()));
+        Commit();
+        exit(OrderId);
+    end;
+
+    local procedure ExerciseMappingRetries(OrderId: BigInteger; var JobQueueEntry: Record "Job Queue Entry"; ImportOrder: JsonObject; ImportLines: JsonArray; var Outcomes: JsonArray)
+    var
+        JobQueueStartReport: Codeunit "Job Queue Start Report";
+        Index: Integer;
+    begin
+        JobQueueStartReport.Run(JobQueueEntry);
+        this.CaptureMappingOutcome(OrderId, this.ExpectedMappingDetails(true), true, false, false, 0, Outcomes);
+        this.RestageMappingOrder(OrderId, ImportOrder, ImportLines);
+        Clear(JobQueueStartReport);
+        JobQueueStartReport.Run(JobQueueEntry);
+        this.CaptureMappingOutcome(OrderId, this.ExpectedMappingDetails(true), true, false, false, 0, Outcomes);
+
+        for Index := 1 to 2 do begin
+            this.RunMappingPath(OrderId, 'Manual');
+            this.CaptureMappingOutcome(OrderId, this.ExpectedProcessingMappingDetails(true), true, false, false, 0, Outcomes);
+            this.RunMappingPath(OrderId, 'Batch');
+            this.CaptureMappingOutcome(OrderId, this.ExpectedProcessingMappingDetails(true), true, false, false, 0, Outcomes);
+        end;
+
+        this.CorrectMappingOrder(OrderId);
+        this.RunMappingPath(OrderId, 'Batch');
+        this.CaptureMappingOutcome(OrderId, '', false, false, true, 1, Outcomes);
+        this.RunMappingPath(OrderId, 'Batch');
+        this.CaptureMappingOutcome(OrderId, '', false, false, true, 1, Outcomes);
+    end;
+
+    local procedure RestageMappingOrder(OrderId: BigInteger; ImportOrder: JsonObject; ImportLines: JsonArray)
+    var
+        OrdersToImport: Record "Shpfy Orders to Import";
+        OrderHeader: Record "Shpfy Order Header";
+    begin
+        OrderHeader.Get(OrderId);
+        this.Shop.Get(OrderHeader."Shop Code");
+        OrdersToImport."Shop Id" := this.Shop."Shop Id";
+        OrdersToImport."Shop Code" := this.Shop.Code;
+        OrdersToImport.Id := OrderId;
+        OrdersToImport."Import Action" := OrdersToImport."Import Action"::New;
+        OrdersToImport.Insert(false);
+        this.EnqueueAutoCreateOrderResponses(ImportOrder, ImportLines);
+        this.EnqueueMappingExchangeResponse(OrderId);
+        Commit();
+    end;
+
+    local procedure EnqueueMappingExchangeResponse(OrderId: BigInteger)
+    begin
+        this.HttpResponses.Enqueue(StrSubstNo('{"data":{"order":{"returns":{"nodes":[{"exchangeLineItems":{"nodes":[{"lineItems":[{"id":"gid://shopify/LineItem/%1"}]}]}}],"pageInfo":{"hasNextPage":false}}}}}', OrderId * 10 + 5));
+    end;
+
+    [ConfirmHandler]
+    internal procedure MappingConfirmHandler(Question: Text[1024]; var Reply: Boolean)
+    begin
+        Reply := true;
+    end;
+
+    local procedure SetOrderError(var OrderHeader: Record "Shpfy Order Header"; ErrorMessage: Text)
+    begin
+        OrderHeader."Has Error" := true;
+        OrderHeader."Error Message" := CopyStr(ErrorMessage, 1, MaxStrLen(OrderHeader."Error Message"));
+        OrderHeader.Modify(false);
+    end;
+
+    local procedure SetAutomaticOrderCreation(Enabled: Boolean)
+    begin
+        this.Shop.Get(this.Shop.Code);
+        this.Shop."Auto Create Orders" := Enabled;
+        this.Shop.Modify(false);
+    end;
+
+    local procedure CreateMappingImportFixture(var OrdersToImport: Record "Shpfy Orders to Import"; var JOrder: JsonObject; var JLines: JsonArray)
+    var
+        Item: Record Item;
+        Product: Record "Shpfy Product";
+        Variant: Record "Shpfy Variant";
+        OrdersAPI: Codeunit "Shpfy Orders API";
+        OrderHandlingHelper: Codeunit "Shpfy Order Handling Helper";
+        OrdersResponse: JsonObject;
+        Node: JsonToken;
+        Customer: JsonObject;
+        ContactDetails: JsonObject;
+        Address: JsonObject;
+        PriceSet: JsonObject;
+        Money: JsonObject;
+        TaxLine: JsonObject;
+        TaxLines: JsonArray;
+        Line: JsonObject;
+        ProductJson: JsonObject;
+        VariantJson: JsonObject;
+        Cursor: Text;
+    begin
+        OrdersResponse := OrderHandlingHelper.GetOrdersToImport(false);
+        OrdersToImport.SetRange("Shop Id", this.Shop."Shop Id");
+        OrdersToImport.DeleteAll(false);
+        OrdersAPI.ExtractShopifyOrdersToImport(this.Shop, OrdersResponse, Cursor);
+        OrdersToImport.SetRange("Shop Id", this.Shop."Shop Id");
+        OrdersToImport.FindFirst();
+        OrdersToImport."Order Amount" := 110;
+        OrdersToImport.Modify(false);
+        OrdersResponse.GetObject('data').GetObject('orders').GetArray('edges').Get(0, Node);
+        JOrder := Node.AsObject().GetObject('node');
+        JOrder.Replace('legacyResourceId', OrdersToImport.Id);
+        JOrder.Replace('name', OrdersToImport."Order No.");
+        JOrder.Add('confirmed', true);
+        JOrder.Add('email', '');
+        JOrder.Add('phone', '');
+        Customer.Add('legacyResourceId', 0);
+        Customer.Add('firstName', 'Mapping');
+        Customer.Add('lastName', 'Test');
+        ContactDetails.Add('emailAddress', '');
+        Customer.Add('defaultEmailAddress', ContactDetails);
+        Clear(ContactDetails);
+        ContactDetails.Add('phoneNumber', '');
+        Customer.Add('defaultPhoneNumber', ContactDetails);
+        JOrder.Add('customer', Customer);
+        Address.Add('firstName', 'Mapping');
+        Address.Add('lastName', 'Test');
+        JOrder.Add('displayAddress', Address);
+        JOrder.Add('shippingAddress', Address);
+        JOrder.Add('billingAddress', Address);
+        JOrder.Add('currencyCode', OrdersToImport."Currency Code");
+        JOrder.Add('presentmentCurrencyCode', OrdersToImport."Currency Code");
+        JOrder.Add('taxesIncluded', true);
+        Money.Add('amount', 110);
+        Money.Add('currencyCode', OrdersToImport."Currency Code");
+        PriceSet.Add('shopMoney', Money);
+        PriceSet.Add('presentmentMoney', Money);
+        JOrder.Replace('totalPriceSet', PriceSet);
+        JOrder.Add('currentTotalPriceSet', PriceSet);
+        JOrder.Add('subtotalPriceSet', PriceSet);
+        JOrder.Add('currentSubtotalPriceSet', PriceSet);
+        Money.Replace('amount', 10);
+        PriceSet.Replace('shopMoney', Money);
+        PriceSet.Replace('presentmentMoney', Money);
+        JOrder.Add('totalTaxSet', PriceSet);
+        JOrder.Add('currentTotalTaxSet', PriceSet);
+        TaxLine.Add('title', 'VAT');
+        TaxLine.Add('rate', 0.1);
+        TaxLine.Add('priceSet', PriceSet);
+        TaxLines.Add(TaxLine);
+        JOrder.Add('taxLines', TaxLines);
+
+        Item := this.InitializeTest.GetDummyItem();
+        Product.Id := OrdersToImport.Id * 1000;
+        Product."Shop Code" := this.Shop.Code;
+        Product.Title := Item.Description;
+        Product."Item SystemId" := Item.SystemId;
+        Product.Insert(false);
+        Variant.Id := Product.Id;
+        Variant."Product Id" := Product.Id;
+        Variant."Shop Code" := this.Shop.Code;
+        Variant."Item SystemId" := Item.SystemId;
+        Variant.Insert(false);
+        ProductJson.Add('legacyResourceId', Product.Id);
+        ProductJson.Add('isGiftCard', false);
+        VariantJson.Add('legacyResourceId', Variant.Id);
+        Line.ReadFrom('{"quantity":1,"currentQuantity":1,"fulfillableQuantity":1,"taxable":true,"requiresShipping":true,"variantTitle":"","customAttributes":[],"discountAllocations":[]}');
+        Line.Add('id', StrSubstNo('gid://shopify/LineItem/%1', OrdersToImport.Id * 10 + 1));
+        Line.Add('name', Item.Description);
+        Line.Add('title', Item.Description);
+        Line.Add('product', ProductJson);
+        Line.Add('variant', VariantJson);
+        Money.Replace('amount', 110);
+        PriceSet.Replace('shopMoney', Money);
+        PriceSet.Replace('presentmentMoney', Money);
+        Line.Add('originalUnitPriceSet', PriceSet);
+        Line.Add('taxLines', TaxLines);
+        Clear(JLines);
+        JLines.Add(Line);
+    end;
+
+    local procedure PrepareIncompleteOrderImport(IncludeItemGaps: Boolean; var JShopifyOrder: JsonObject; var JShopifyLineItems: JsonArray) OrderId: BigInteger
+    var
+        OrdersToImport: Record "Shpfy Orders to Import";
+        RegisteredStore: Record "Shpfy Registered Store New";
+        AuthenticationMgt: Codeunit "Shpfy Authentication Mgt.";
+        JShopifyCustomer: JsonObject;
+        JDefaultEmailAddress: JsonObject;
+        JDefaultPhoneNumber: JsonObject;
+        LineToken: JsonToken;
+        Line: JsonObject;
+        Variant: Record "Shpfy Variant";
+        LineId: BigInteger;
+        EntryNo: Integer;
+        UnmappedCustomerId: BigInteger;
+        UnmappedEmail: Text;
+        UnmappedPhone: Text;
+    begin
+        this.CreateMappingImportFixture(OrdersToImport, JShopifyOrder, JShopifyLineItems);
+        UnmappedCustomerId := this.LibraryRandom.RandIntInRange(10000000, 99999999);
+        UnmappedEmail := StrSubstNo('unmapped-%1@example.com', UnmappedCustomerId);
+        UnmappedPhone := StrSubstNo('+1%1', UnmappedCustomerId);
+        JShopifyOrder.Remove('email');
+        JShopifyOrder.Add('email', UnmappedEmail);
+        JShopifyOrder.Remove('phone');
+        JShopifyOrder.Add('phone', UnmappedPhone);
+        JShopifyCustomer := JShopifyOrder.GetObject('customer');
+        JShopifyCustomer.Remove('legacyResourceId');
+        JShopifyCustomer.Add('legacyResourceId', UnmappedCustomerId);
+        JDefaultEmailAddress := JShopifyCustomer.GetObject('defaultEmailAddress');
+        JDefaultEmailAddress.Remove('emailAddress');
+        JDefaultEmailAddress.Add('emailAddress', UnmappedEmail);
+        JShopifyCustomer.Remove('defaultEmailAddress');
+        JShopifyCustomer.Add('defaultEmailAddress', JDefaultEmailAddress);
+        JDefaultPhoneNumber := JShopifyCustomer.GetObject('defaultPhoneNumber');
+        JDefaultPhoneNumber.Remove('phoneNumber');
+        JDefaultPhoneNumber.Add('phoneNumber', UnmappedPhone);
+        JShopifyCustomer.Remove('defaultPhoneNumber');
+        JShopifyCustomer.Add('defaultPhoneNumber', JDefaultPhoneNumber);
+        JShopifyOrder.Remove('customer');
+        JShopifyOrder.Add('customer', JShopifyCustomer);
+        EntryNo := OrdersToImport."Entry No.";
+        OrderId := OrdersToImport.Id;
+        if IncludeItemGaps then begin
+            JShopifyLineItems.Get(0, LineToken);
+            Line := LineToken.AsObject();
+            LineId := OrderId * 10 + 1;
+            Line.Replace('id', StrSubstNo('gid://shopify/LineItem/%1', LineId));
+            Variant.Get(Line.GetObject('variant').GetBigInteger('legacyResourceId'));
+            Variant."Item SystemId" := CreateGuid();
+            Variant.Modify(false);
+            JShopifyLineItems.Set(0, Line);
+            Line := Line.Clone().AsObject();
+            Line.Replace('id', StrSubstNo('gid://shopify/LineItem/%1', OrderId * 10 + 5));
+            JShopifyLineItems.Add(Line);
+            this.AddMappingAccountImportLines(OrderId, Line, JShopifyLineItems);
+            JShopifyOrder.Add('returnStatus', 'RETURNED');
+            this.Shop."Return and Refund Process" := this.Shop."Return and Refund Process"::"Import Only";
+            this.Shop.Modify(false);
+        end;
+        OrdersToImport.Reset();
+        OrdersToImport.SetRange("Shop Id", this.Shop."Shop Id");
+        OrdersToImport.SetFilter("Entry No.", '<>%1', EntryNo);
+        OrdersToImport.DeleteAll(false);
+        this.EnqueueAutoCreateOrderResponses(JShopifyOrder, JShopifyLineItems);
+        if IncludeItemGaps then
+            this.EnqueueMappingExchangeResponse(OrderId);
+        RegisteredStore.Get(this.Shop.GetStoreName());
+        RegisteredStore."Requested Scope" := AuthenticationMgt.GetScope();
+        RegisteredStore."Actual Scope" := AuthenticationMgt.GetScope();
+        RegisteredStore.Modify(false);
+        Commit();
+    end;
+
+    local procedure AddMappingAccountImportLines(OrderId: BigInteger; Line: JsonObject; var Lines: JsonArray)
+    var
+        NullValue: JsonValue;
+        EmptyLines: JsonArray;
+        Money: JsonObject;
+        PriceSet: JsonObject;
+    begin
+        Line := Line.Clone().AsObject();
+        NullValue.SetValueToNull();
+        Money.Add('amount', '0');
+        PriceSet.Add('shopMoney', Money);
+        PriceSet.Add('presentmentMoney', Money);
+        Line.Replace('originalUnitPriceSet', PriceSet);
+        Line.Replace('taxLines', EmptyLines);
+        Line.Replace('product', NullValue);
+        Line.Replace('name', 'Tip');
+        Line.Replace('id', StrSubstNo('gid://shopify/LineItem/%1', OrderId * 10 + 3));
+        Lines.Add(Line);
+        Line := Line.Clone().AsObject();
+        Line.Replace('name', 'Gift card');
+        Line.Add('isGiftCard', true);
+        Line.Replace('id', StrSubstNo('gid://shopify/LineItem/%1', OrderId * 10 + 4));
+        Lines.Add(Line);
+    end;
+
     local procedure CreateTaxArea(var TaxArea: Record "Tax Area"; var ShopifyTaxArea: Record "Shpfy Tax Area"; ShopParam: Record "Shpfy Shop")
     var
         ShopifyCustomerTemplate: Record "Shpfy Customer Template";
@@ -1861,6 +2744,75 @@ codeunit 139608 "Shpfy Orders API Test"
         ShopifyCustomer."Customer SystemId" := Customer.SystemId;
         ShopifyCustomer."Shop Id" := ShopParam."Shop Id";
         ShopifyCustomer.Insert(false);
+    end;
+
+    local procedure CreateIncompleteMappingShop(): Record "Shpfy Shop"
+    var
+        CommunicationMgt: Codeunit "Shpfy Communication Mgt.";
+    begin
+        this.Shop := CommunicationMgt.GetShopRecord();
+        this.Shop."Customer Import From Shopify" := this.Shop."Customer Import From Shopify"::None;
+        this.Shop."Auto Create Unknown Customers" := false;
+        this.Shop."Customer Mapping Type" := "Shpfy Customer Mapping"::DefaultCustomer;
+        this.Shop."Default Customer No." := '';
+        this.Shop."Tip Account" := '';
+        this.Shop."Sold Gift Card Account" := '';
+        this.Shop.Modify(false);
+        exit(this.Shop);
+    end;
+
+    local procedure CreateIncompleteMappingOrder(var OrderHeader: Record "Shpfy Order Header")
+    var
+        OrderLine: Record "Shpfy Order Line";
+        OrderId: BigInteger;
+    begin
+        OrderHeader.Reset();
+        repeat
+            OrderId := this.LibraryRandom.RandIntInRange(100000, 999999);
+        until not OrderHeader.Get(OrderId);
+
+        OrderHeader.Init();
+        OrderHeader."Shopify Order Id" := OrderId;
+        OrderHeader."Shop Code" := this.Shop.Code;
+        OrderHeader."Sell-to Customer Name" := 'Unmapped test customer';
+        OrderHeader."Bill-to Name" := 'Unmapped test customer';
+        OrderHeader."Ship-to Country/Region Code" := this.LibraryRandom.RandText(MaxStrLen(OrderHeader."Ship-to Country/Region Code"));
+        OrderHeader."Customer Id" := this.LibraryRandom.RandIntInRange(100000, 999999);
+        OrderHeader.Insert(false);
+
+        OrderLine.Init();
+        OrderLine."Shopify Order Id" := OrderHeader."Shopify Order Id";
+        OrderLine."Line Id" := OrderHeader."Shopify Order Id" * 10 + 3;
+        OrderLine.Tip := true;
+        OrderLine.Quantity := 1;
+        OrderLine.Insert(false);
+
+        OrderLine.Init();
+        OrderLine."Shopify Order Id" := OrderHeader."Shopify Order Id";
+        OrderLine."Line Id" := OrderHeader."Shopify Order Id" * 10 + 4;
+        OrderLine."Gift Card" := true;
+        OrderLine.Quantity := 1;
+        OrderLine.Insert(false);
+    end;
+
+    local procedure CreateUnmappedItemLine(OrderId: BigInteger; LineId: BigInteger; IsExchangeItem: Boolean)
+    var
+        ShopifyVariant: Record "Shpfy Variant";
+        OrderLine: Record "Shpfy Order Line";
+    begin
+        ShopifyVariant.Init();
+        ShopifyVariant.Id := LineId;
+        ShopifyVariant."Shop Code" := this.Shop.Code;
+        ShopifyVariant."Item SystemId" := CreateGuid();
+        ShopifyVariant.Insert(false);
+
+        OrderLine.Init();
+        OrderLine."Shopify Order Id" := OrderId;
+        OrderLine."Line Id" := LineId;
+        OrderLine."Shopify Variant Id" := LineId;
+        OrderLine."Is Exchange Item" := IsExchangeItem;
+        OrderLine.Quantity := 1;
+        OrderLine.Insert(false);
     end;
 
     local procedure Initialize()

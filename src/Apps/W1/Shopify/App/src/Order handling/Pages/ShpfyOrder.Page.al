@@ -297,6 +297,8 @@ page 30113 "Shpfy Order"
                 {
                     ApplicationArea = All;
                     Editable = false;
+                    MultiLine = true;
+                    StyleExpr = ErrorMessageStyleTxt;
                     ToolTip = 'Specifies the error message if an error has occurred.';
                 }
                 field(WorkDescription; WorkDescription)
@@ -698,9 +700,13 @@ page 30113 "Shpfy Order"
                     trigger OnAction()
                     var
                         Mapping: Codeunit "Shpfy Order Mapping";
+                        MissingIssues: List of [Text];
                     begin
                         CurrPage.Update(true);
-                        Mapping.DoMapping(Rec);
+                        if Mapping.DoMappingWithIssues(Rec, MissingIssues, 'FindMappings') then
+                            Mapping.ClearMappingError(Rec)
+                        else
+                            Mapping.PersistMappingError(Rec, MissingIssues);
                         CurrPage.Update(false);
                     end;
                 }
@@ -1139,11 +1145,16 @@ page 30113 "Shpfy Order"
         LogEntriesLbl: Label 'Log Entries';
         WorkDescription: Text;
         PresentmentVisible: Boolean;
+        ErrorMessageStyleTxt: Text;
 
     trigger OnAfterGetRecord()
     begin
         SetPresentmentCurrencyVisibility();
         WorkDescription := Rec.GetWorkDescription();
+        if Rec."Has Error" then
+            ErrorMessageStyleTxt := 'Unfavorable'
+        else
+            Clear(ErrorMessageStyleTxt);
     end;
 
     local procedure SetPresentmentCurrencyVisibility()
