@@ -49,12 +49,20 @@ codeunit 30167 "Shpfy Process Orders"
     internal procedure ProcessShopifyOrder(ShopifyOrderHeader: Record "Shpfy Order Header")
     var
         ProcessOrder: Codeunit "Shpfy Process Order";
+        OrderMapping: Codeunit "Shpfy Order Mapping";
+        ErrorMessage: Text;
     begin
         if not ShopifyOrderHeader.Processed then begin
             if not ProcessOrder.Run(ShopifyOrderHeader) then begin
                 ShopifyOrderHeader.Get(ShopifyOrderHeader."Shopify Order Id");
-                ShopifyOrderHeader."Has Error" := true;
-                ShopifyOrderHeader."Error Message" := CopyStr(Format(Time) + ' ' + GetLastErrorText(), 1, MaxStrLen(ShopifyOrderHeader."Error Message"));
+                ErrorMessage := GetLastErrorText();
+                if OrderMapping.IsMappingError(ErrorMessage) then
+                    OrderMapping.PersistMappingErrorMessage(ShopifyOrderHeader, ErrorMessage)
+                else
+                    if not ShopifyOrderHeader."Has Error" or OrderMapping.IsMappingError(ShopifyOrderHeader."Error Message") then begin
+                        ShopifyOrderHeader."Has Error" := true;
+                        ShopifyOrderHeader."Error Message" := CopyStr(Format(Time) + ' ' + ErrorMessage, 1, MaxStrLen(ShopifyOrderHeader."Error Message"));
+                    end;
                 ShopifyOrderHeader."Sales Order No." := '';
                 ShopifyOrderHeader."Sales Invoice No." := '';
                 ProcessOrder.CleanUpLastCreatedDocument();
@@ -98,7 +106,6 @@ codeunit 30167 "Shpfy Process Orders"
         if Shop."Return and Refund Process" = "Shpfy ReturnRefund ProcessType"::"Auto Create Credit Memo" then begin
             IReturnRefundProcess := Shop."Return and Refund Process";
             RefundHeader.SetRange("Is Processed", false);
-            RefundHeader.SetLoadFields("Refund Id");
             if RefundHeader.FindSet(false) then
                 repeat
                     IReturnRefundProcess.CreateSalesDocument("Shpfy Source Document Type"::Refund, RefundHeader."Refund Id");
@@ -112,5 +119,3 @@ codeunit 30167 "Shpfy Process Orders"
         Shop := ShopifyShop;
     end;
 }
-
-

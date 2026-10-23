@@ -70,6 +70,7 @@ report 30104 "Shpfy Sync Orders from Shopify"
                             OrdersToImport.Delete();
                             Commit();
                             if OrderMapping.DoMappingWithIssues(OrderHeader, MissingIssues, 'Automatic') then begin
+                                OrderMapping.ClearMappingError(OrderHeader);
                                 if (OrdersToImport."Import Action" = OrdersToImport."Import Action"::New) and Shop."Auto Create Orders" then
                                     CreateSalesDocumentForOrders(OrderHeader);
                             end else
@@ -158,7 +159,6 @@ report 30104 "Shpfy Sync Orders from Shopify"
         if Shop."Return and Refund Process" = "Shpfy ReturnRefund ProcessType"::"Auto Create Credit Memo" then begin
             IReturnRefundProcess := Shop."Return and Refund Process";
             RefundHeader.SetRange("Is Processed", false);
-            RefundHeader.SetLoadFields("Refund Id");
             if RefundHeader.FindSet(false) then begin
                 if GuiAllowed then begin
                     ToProcess := RefundHeader.Count;
