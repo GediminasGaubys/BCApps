@@ -2055,7 +2055,7 @@ codeunit 139608 "Shpfy Orders API Test"
         MappingCustomerMismatchErr: Label 'Order %1 must retain the customer selected by the existing mapping rules.', Comment = '%1 = Shopify order id';
         MappingCasesMismatchErr: Label 'Every prepared mapping case must be executed.';
         MappingItemWordingErr: Label 'Item-line issues must be rendered with their Shopify line ID.';
-        MappingItemIssueLbl: Label 'Item mapping is missing for Shopify order line ID %1.', Comment = '%1 = Shopify order line ID';
+        MappingItemIssueLbl: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
         ItemLineIssuePrefixTok: Label 'ItemLine:', Locked = true;
         MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
         MappingItemTokenExposureErr: Label 'Internal item-line issue tokens must not be shown to the user.';
@@ -2152,7 +2152,7 @@ codeunit 139608 "Shpfy Orders API Test"
         ExpectedError: Text;
         RemainingError: TextBuilder;
         MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
-        MappingItemMissingLbl: Label 'Item mapping is missing for Shopify order line ID %1.', Comment = '%1 = Shopify order line ID';
+        MappingItemMissingLbl: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
         MappingTipDetailLbl: Label 'Tip Account must have a value in Shopify Shop.';
         MappingGiftCardDetailLbl: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
         MappingUnrelatedLbl: Label 'Unrelated active error. Not everything can be mapped. Preserve the entire original diagnostic.';
@@ -2313,7 +2313,7 @@ codeunit 139608 "Shpfy Orders API Test"
         MappingGiftCardDetailLbl: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
         MappingSellToDetailLbl: Label 'Sell-to Customer No. is missing.';
         MappingBillToDetailLbl: Label 'Bill-to Customer No. is missing.';
-        MappingItemMissingLbl: Label 'Item mapping is missing for Shopify order line ID %1.';
+        MappingItemMissingLbl: Label 'Item No. is missing on Shopify order line %1.';
     begin
         Builder.AppendLine(MappingPrefixTok);
         Builder.AppendLine(MappingSellToDetailLbl);

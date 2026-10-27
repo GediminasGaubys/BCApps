@@ -147,7 +147,7 @@ codeunit 30163 "Shpfy Order Mapping"
         BillToCustomerMissingErr: Label 'Bill-to Customer No. is missing.';
         TipAccountMissingErr: Label 'Tip Account must have a value in Shopify Shop.';
         GiftCardAccountMissingErr: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
-        ItemLineMissingErr: Label 'Item mapping is missing for Shopify order line ID %1.', Comment = '%1 = Shopify order line ID';
+        ItemLineMissingErr: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
     begin
         ErrorBuilder.AppendLine(MappingErr);
         foreach MissingIssue in MissingIssues do
