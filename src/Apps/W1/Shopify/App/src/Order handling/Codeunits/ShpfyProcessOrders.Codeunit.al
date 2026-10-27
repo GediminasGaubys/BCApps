@@ -106,6 +106,7 @@ codeunit 30167 "Shpfy Process Orders"
         if Shop."Return and Refund Process" = "Shpfy ReturnRefund ProcessType"::"Auto Create Credit Memo" then begin
             IReturnRefundProcess := Shop."Return and Refund Process";
             RefundHeader.SetRange("Is Processed", false);
+            RefundHeader.SetLoadFields("Refund Id");
             if RefundHeader.FindSet(false) then
                 repeat
                     IReturnRefundProcess.CreateSalesDocument("Shpfy Source Document Type"::Refund, RefundHeader."Refund Id");
