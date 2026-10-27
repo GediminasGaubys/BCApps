@@ -88,6 +88,7 @@ codeunit 30163 "Shpfy Order Mapping"
         end;
 
         OrderLine.SetRange("Shopify Order Id", OrderHeader."Shopify Order Id");
+        OrderLine.SetLoadFields("Shopify Order Id", "Line Id", "Gift Card", Tip, "Shopify Variant Id", "Shopify Product Id", "Item No.", "Variant Code", "Unit of Measure Code");
         if OrderLine.FindSet(true) then
             repeat
                 if OrderLine.Tip then begin
