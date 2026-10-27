@@ -70,11 +70,11 @@ codeunit 139561 "Shpfy Initialize Test"
         ItemTemplateCode := CreateItemTemplate(PostingGroupCode);
         Shop."Customer Templ. Code" := CreateCustomerTemplate(PostingGroupCode);
         Shop."Item Templ. Code" := CreateItemTemplate(PostingGroupCode);
+        CreateVATPostingSetup(PostingGroupCode, PostingGroupCode);
+        CreateVATPostingSetup(PostingGroupCode, '');
         CreateGLAccountWithPostingSetup(RefundGLAccount, VATPostingSetup, PostingGroupCode);
         RefundGLAccount."Direct Posting" := true;
         RefundGLAccount.Modify();
-        CreateVATPostingSetup(PostingGroupCode, PostingGroupCode);
-        CreateVATPostingSetup(PostingGroupCode, '');
         CreateVATPostingSetup(PostingGroupCode, RefundGLAccount."VAT Prod. Posting Group");
         Shop."Shipping Charges Account" := CreateShippingChargesGLAcc(VATPostingSetup, PostingGroupCode);
         Shop."Customer Posting Group" := PostingGroupCode;

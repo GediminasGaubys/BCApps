@@ -14,9 +14,9 @@ pageextension 30433 "Shpfy Payment Methods Mapping" extends "Shpfy Payment Metho
             action(DiscoverPaymentMethods)
             {
                 ApplicationArea = All;
-                Caption = 'Discover Payment Methods';
+                Caption = 'Discover payment methods';
                 Image = Refresh;
-                ToolTip = 'Find payment methods used on recent Shopify orders and add new entries to Payment Method Mapping. Existing entries aren''t changed.';
+                ToolTip = 'Find payment methods used on recent Shopify orders and add new entries to payment method mapping. Existing entries aren''t changed.';
 
                 trigger OnAction()
                 var

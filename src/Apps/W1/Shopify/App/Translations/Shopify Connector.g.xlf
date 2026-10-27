@@ -14458,40 +14458,40 @@
           <note from="Developer" annotates="general" priority="2"></note>
           <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Order Processor RC - Action ShpfyShopify Transactions - Property Caption</note>
         </trans-unit>
-        <trans-unit id="Page 1989093266 - NamedType 1985316984" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
-          <source>You do not have permission to modify payment method mappings.</source>
-          <note from="Developer" annotates="general" priority="2"></note>
-          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - NamedType MappingModificationPermissionErr</note>
-        </trans-unit>
-        <trans-unit id="Page 1989093266 - NamedType 3573829486" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
-          <source>No new Shopify payment methods were found in the 100 most recent orders.</source>
-          <note from="Developer" annotates="general" priority="2"></note>
-          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - NamedType NoNewPaymentMethodsMsg</note>
-        </trans-unit>
-        <trans-unit id="Page 1989093266 - NamedType 1208598245" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
-          <source>No Shopify orders are available for payment method discovery.</source>
-          <note from="Developer" annotates="general" priority="2"></note>
-          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - NamedType NoOrdersFoundMsg</note>
-        </trans-unit>
-        <trans-unit id="Page 1989093266 - NamedType 733839033" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
-          <source>Open this page from a Shopify Shop Card to discover payment methods.</source>
-          <note from="Developer" annotates="general" priority="2"></note>
-          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - NamedType ShopContextRequiredErr</note>
-        </trans-unit>
-        <trans-unit id="Page 1989093266 - NamedType 1100090462" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
-          <source>The Shopify Shop %1 could not be found.</source>
-          <note from="Developer" annotates="general" priority="2">%1 = Shopify Shop code</note>
-          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - NamedType ShopNotFoundErr</note>
-        </trans-unit>
         <trans-unit id="Page 1989093266 - Action 696546967 - Property 1295455071" size-unit="char" translate="yes" xml:space="preserve" al-object-target="Page 1989093266">
-          <source>Find payment methods used on recent Shopify orders and add new entries to Payment Method Mapping. Existing entries aren't changed.</source>
+          <source>Find payment methods used on recent Shopify orders and add new entries to payment method mapping. Existing entries aren't changed.</source>
           <note from="Developer" annotates="general" priority="2"></note>
           <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - Action DiscoverPaymentMethods - Property ToolTip</note>
         </trans-unit>
         <trans-unit id="Page 1989093266 - Action 696546967 - Property 2879900210" size-unit="char" translate="yes" xml:space="preserve" al-object-target="Page 1989093266">
-          <source>Discover Payment Methods</source>
+          <source>Discover payment methods</source>
           <note from="Developer" annotates="general" priority="2"></note>
           <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - Action DiscoverPaymentMethods - Property Caption</note>
+        </trans-unit>
+        <trans-unit id="Page 1989093266 - Action 696546967 - Method 1377591017 - NamedType 733839033" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
+          <source>Open this page from a Shopify Shop Card to discover payment methods.</source>
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - Action DiscoverPaymentMethods - Method OnAction - NamedType ShopContextRequiredErr</note>
+        </trans-unit>
+        <trans-unit id="Page 1989093266 - Action 696546967 - Method 1377591017 - NamedType 1100090462" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
+          <source>The Shopify Shop %1 could not be found.</source>
+          <note from="Developer" annotates="general" priority="2">%1 = Shopify Shop code</note>
+          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - Action DiscoverPaymentMethods - Method OnAction - NamedType ShopNotFoundErr</note>
+        </trans-unit>
+        <trans-unit id="Page 1989093266 - Action 696546967 - Method 1377591017 - NamedType 1985316984" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
+          <source>You do not have permission to modify payment method mappings.</source>
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - Action DiscoverPaymentMethods - Method OnAction - NamedType MappingModificationPermissionErr</note>
+        </trans-unit>
+        <trans-unit id="Page 1989093266 - Action 696546967 - Method 1377591017 - NamedType 3573829486" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
+          <source>No new Shopify payment methods were found in the 100 most recent orders.</source>
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - Action DiscoverPaymentMethods - Method OnAction - NamedType NoNewPaymentMethodsMsg</note>
+        </trans-unit>
+        <trans-unit id="Page 1989093266 - Action 696546967 - Method 1377591017 - NamedType 1208598245" size-unit="char" translate="yes" xml:space="preserve" al-object-target="PageExtension 1989093266">
+          <source>No Shopify orders are available for payment method discovery.</source>
+          <note from="Developer" annotates="general" priority="2"></note>
+          <note from="Xliff Generator" annotates="general" priority="3">PageExtension Shpfy Payment Methods Mapping - Action DiscoverPaymentMethods - Method OnAction - NamedType NoOrdersFoundMsg</note>
         </trans-unit>
         <trans-unit id="PageExtension 957725305 - Control 3700847453 - Property 1295455071" size-unit="char" translate="yes" xml:space="preserve" al-object-target="Page 1379883806">
           <source>Specifies the order number from Shopify</source>
