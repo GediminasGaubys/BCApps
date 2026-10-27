@@ -42,10 +42,11 @@ codeunit 30166 "Shpfy Process Order"
         OrderHeader.Get(Rec."Shopify Order Id");
         ClearProcessingError(OrderHeader);
         OrderEvents.OnBeforeProcessSalesDocument(OrderHeader);
-        if CurrentClientType() = ClientType::Background then
-            MappingExecutionMode := 'Background';
         if MappingExecutionMode = '' then
-            MappingExecutionMode := 'Manual';
+            if CurrentClientType() = ClientType::Background then
+                MappingExecutionMode := 'Background'
+            else
+                MappingExecutionMode := 'Manual';
         if not OrderMapping.DoMappingWithIssues(OrderHeader, MissingIssues, MappingExecutionMode) then
             Error(OrderMapping.GetMappingErrorMessage(MissingIssues));
 

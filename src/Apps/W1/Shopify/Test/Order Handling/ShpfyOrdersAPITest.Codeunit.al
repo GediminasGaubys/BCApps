@@ -16,7 +16,6 @@ using Microsoft.Sales.Customer;
 using Microsoft.Sales.Document;
 using Microsoft.Sales.Setup;
 using System.TestLibraries.Utilities;
-using System.Threading;
 
 codeunit 139608 "Shpfy Orders API Test"
 {
@@ -2569,7 +2568,7 @@ codeunit 139608 "Shpfy Orders API Test"
         JOrder.Add('currencyCode', OrdersToImport."Currency Code");
         JOrder.Add('presentmentCurrencyCode', OrdersToImport."Currency Code");
         JOrder.Add('taxesIncluded', true);
-        Money.Add('amount', 110);
+        Money.Add('amount', '110');
         Money.Add('currencyCode', OrdersToImport."Currency Code");
         PriceSet.Add('shopMoney', Money);
         PriceSet.Add('presentmentMoney', Money);
