@@ -10,14 +10,12 @@ namespace Microsoft.Integration.Shopify;
 /// </summary>
 codeunit 30432 "Shpfy Discover Payment Methods"
 {
-    Access = Internal;
-
     var
         CommunicationMgt: Codeunit "Shpfy Communication Mgt.";
         JsonHelper: Codeunit "Shpfy Json Helper";
         InsertFailedErr: Label 'A payment method discovery value could not be inserted.';
 
-    internal procedure Discover(ShopCode: Code[20])
+    internal procedure Discover(ShopCode: Code[20]; var HasOrders: Boolean; var CreatedMappingCount: Integer)
     var
         JResponse: JsonToken;
         JOrders: JsonArray;
@@ -36,6 +34,7 @@ codeunit 30432 "Shpfy Discover Payment Methods"
 
         if not JsonHelper.GetJsonArray(JResponse, JOrders, 'data.orders.nodes') then
             Error(ResponseShapeErr);
+        HasOrders := JOrders.Count() > 0;
 
         foreach JOrder in JOrders do begin
             if not JsonHelper.GetJsonArray(JOrder, JTransactions, 'transactions') then
@@ -50,7 +49,7 @@ codeunit 30432 "Shpfy Discover Payment Methods"
         end;
 
         CreateMissingLookups(GatewayKeys, CreditCardCompanyLookupNames);
-        CreateMissingMappings(ShopCode, GatewayKeys, CreditCardCompanyKeys, ManualPaymentGatewayValues);
+    CreateMissingMappings(ShopCode, GatewayKeys, CreditCardCompanyKeys, ManualPaymentGatewayValues, CreatedMappingCount);
     end;
 
     local procedure StageTransaction(JTransaction: JsonToken; var GatewayKeys: List of [Text]; var CreditCardCompanyKeys: List of [Text]; var ManualPaymentGatewayValues: List of [Boolean]; var CreditCardCompanyLookupNames: List of [Text])
@@ -72,7 +71,7 @@ codeunit 30432 "Shpfy Discover Payment Methods"
         if CreditCardCompanyLookupName <> '' then
             AddUniqueCreditCardCompany(CreditCardCompanyLookupName, CreditCardCompanyLookupNames);
 
-        for Index := 1 to GatewayKeys.Count do
+        for Index := 1 to GatewayKeys.Count() do
             if (GatewayKeys.Get(Index) = Gateway) and (CreditCardCompanyKeys.Get(Index) = CreditCardCompanyKey) then
                 exit;
 
@@ -102,7 +101,7 @@ codeunit 30432 "Shpfy Discover Payment Methods"
             if not TransactionGateway.Get(Gateway) then begin
                 TransactionGateway.Init();
                 TransactionGateway.Name := CopyStr(Gateway, 1, MaxStrLen(TransactionGateway.Name));
-                if not TransactionGateway.Insert() then
+                if not TransactionGateway.Insert(false) then
                     if not TransactionGateway.Get(TransactionGateway.Name) then
                         Error(InsertFailedErr);
             end;
@@ -111,27 +110,30 @@ codeunit 30432 "Shpfy Discover Payment Methods"
             if not CreditCardCompany.Get(CreditCardCompanyName) then begin
                 CreditCardCompany.Init();
                 CreditCardCompany.Name := CopyStr(CreditCardCompanyName, 1, MaxStrLen(CreditCardCompany.Name));
-                if not CreditCardCompany.Insert() then
+                if not CreditCardCompany.Insert(false) then
                     if not CreditCardCompany.Get(CreditCardCompany.Name) then
                         Error(InsertFailedErr);
             end;
     end;
 
-    local procedure CreateMissingMappings(ShopCode: Code[20]; GatewayKeys: List of [Text]; CreditCardCompanyKeys: List of [Text]; ManualPaymentGatewayValues: List of [Boolean])
+    local procedure CreateMissingMappings(ShopCode: Code[20]; GatewayKeys: List of [Text]; CreditCardCompanyKeys: List of [Text]; ManualPaymentGatewayValues: List of [Boolean]; var CreatedMappingCount: Integer)
     var
         PaymentMethodMapping: Record "Shpfy Payment Method Mapping";
         Index: Integer;
     begin
-        for Index := 1 to GatewayKeys.Count do
+        CreatedMappingCount := 0;
+        for Index := 1 to GatewayKeys.Count() do
             if not PaymentMethodMapping.Get(ShopCode, GatewayKeys.Get(Index), CreditCardCompanyKeys.Get(Index)) then begin
                 PaymentMethodMapping.Init();
                 PaymentMethodMapping."Shop Code" := ShopCode;
                 PaymentMethodMapping.Gateway := CopyStr(GatewayKeys.Get(Index), 1, MaxStrLen(PaymentMethodMapping.Gateway));
                 PaymentMethodMapping."Credit Card Company" := CopyStr(CreditCardCompanyKeys.Get(Index), 1, MaxStrLen(PaymentMethodMapping."Credit Card Company"));
                 PaymentMethodMapping."Manual Payment Gateway" := ManualPaymentGatewayValues.Get(Index);
-                if not PaymentMethodMapping.Insert() then
+                if not PaymentMethodMapping.Insert(false) then begin
                     if not PaymentMethodMapping.Get(ShopCode, PaymentMethodMapping.Gateway, PaymentMethodMapping."Credit Card Company") then
                         Error(InsertFailedErr);
+                end else
+                    CreatedMappingCount += 1;
             end;
     end;
 }

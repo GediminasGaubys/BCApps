@@ -310,6 +310,8 @@ codeunit 139697 "Shpfy Transactions Test"
         CardCompanyFirst: Text[50];
         CardCompanySecond: Text[50];
         ExistingCardCompany: Code[30];
+        HasOrders: Boolean;
+        CreatedMappingCount: Integer;
     begin
         //[SCENARIO] Repeated discovery does not duplicate normalized mapping combinations.
 
@@ -343,8 +345,8 @@ codeunit 139697 "Shpfy Transactions Test"
         DiscoveryResponse := CreateNormalizedMappingDiscoveryResponse(Gateway, CardCompanyFirst, CardCompanySecond, FifthGateway, IgnoredGateway, ExistingGateway, ExistingCardCompany, SecondOrderGateway);
 
         //[WHEN] Payment method discovery runs twice for the shop.
-        DiscoverPaymentMethods.Discover(Shop.Code);
-        DiscoverPaymentMethods.Discover(Shop.Code);
+        DiscoverPaymentMethods.Discover(Shop.Code, HasOrders, CreatedMappingCount);
+        DiscoverPaymentMethods.Discover(Shop.Code, HasOrders, CreatedMappingCount);
 
         //[THEN] Repeated discovery does not duplicate normalized mapping combinations.
         PaymentMethodMapping.SetRange("Shop Code", Shop.Code);
@@ -361,6 +363,8 @@ codeunit 139697 "Shpfy Transactions Test"
         ShpfyTransactionsTest: Codeunit "Shpfy Transactions Test";
         FirstGateway: Code[30];
         FailingGateway: Code[30];
+        HasOrders: Boolean;
+        CreatedMappingCount: Integer;
     begin
         //[SCENARIO] Discovery rolls back new mappings when a mapping insert fails.
 
@@ -387,7 +391,7 @@ codeunit 139697 "Shpfy Transactions Test"
         PaymentMethodMapping.SetFilter(Gateway, '%1|%2', FirstGateway, FailingGateway);
 
         //[WHEN] Discovery encounters the injected mapping-insert failure.
-        asserterror DiscoverPaymentMethods.Discover(Shop.Code);
+        asserterror DiscoverPaymentMethods.Discover(Shop.Code, HasOrders, CreatedMappingCount);
 
         UnbindSubscription(ShpfyTransactionsTest);
         ShpfyTransactionsTest.ClearPaymentMethodMappingInsertFailure();
@@ -439,6 +443,8 @@ codeunit 139697 "Shpfy Transactions Test"
         PaymentMethodMapping: Record "Shpfy Payment Method Mapping";
         DiscoverPaymentMethods: Codeunit "Shpfy Discover Payment Methods";
         Gateway: Text[30];
+        HasOrders: Boolean;
+        CreatedMappingCount: Integer;
     begin
         //[SCENARIO] Discovery does not write lookups or mappings after a Shopify read failure.
 
@@ -461,10 +467,34 @@ codeunit 139697 "Shpfy Transactions Test"
         PaymentMethodMapping.SetRange(Gateway, Gateway);
 
         //[WHEN] Discovery reads the failed Shopify response.
-        asserterror DiscoverPaymentMethods.Discover(Shop.Code);
+        asserterror DiscoverPaymentMethods.Discover(Shop.Code, HasOrders, CreatedMappingCount);
 
         //[THEN] The failed Shopify read creates neither a gateway lookup nor a mapping.
         LibraryAssert.IsTrue(TransactionGateway.IsEmpty() and PaymentMethodMapping.IsEmpty(), 'A failed Shopify read must not create local gateway lookups or mappings');
+    end;
+
+    [Test]
+    [HandlerFunctions('PaymentMethodDiscoveryHttpHandler')]
+    procedure DiscoverPaymentMethodsReportsNoOrders()
+    var
+        DiscoverPaymentMethods: Codeunit "Shpfy Discover Payment Methods";
+        HasOrders: Boolean;
+        CreatedMappingCount: Integer;
+    begin
+        //[SCENARIO] Discovery distinguishes a shop with no orders from one whose orders add no mappings.
+
+        //[GIVEN] The test infrastructure is initialized.
+        Initialize();
+
+        //[GIVEN] Shopify returns no orders.
+        DiscoveryResponse := '{"data":{"orders":{"nodes":[]}}}';
+
+        //[WHEN] Payment method discovery runs.
+        DiscoverPaymentMethods.Discover(Shop.Code, HasOrders, CreatedMappingCount);
+
+        //[THEN] Discovery reports no orders and creates no mappings.
+        LibraryAssert.IsFalse(HasOrders, 'Discovery should report when Shopify returns no orders');
+        LibraryAssert.AreEqual(0, CreatedMappingCount, 'No mappings should be created when Shopify returns no orders');
     end;
     #endregion
 
