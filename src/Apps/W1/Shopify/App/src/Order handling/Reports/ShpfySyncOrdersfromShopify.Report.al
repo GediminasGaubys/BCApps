@@ -159,6 +159,7 @@ report 30104 "Shpfy Sync Orders from Shopify"
         if Shop."Return and Refund Process" = "Shpfy ReturnRefund ProcessType"::"Auto Create Credit Memo" then begin
             IReturnRefundProcess := Shop."Return and Refund Process";
             RefundHeader.SetRange("Is Processed", false);
+            RefundHeader.SetLoadFields("Refund Id");
             if RefundHeader.FindSet(false) then begin
                 if GuiAllowed then begin
                     ToProcess := RefundHeader.Count;
