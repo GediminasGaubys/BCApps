@@ -5,6 +5,7 @@
 
 namespace Microsoft.Integration.Shopify.Test;
 
+using Microsoft.Foundation.Address;
 using Microsoft.Foundation.Company;
 using Microsoft.Foundation.PaymentTerms;
 using Microsoft.Integration.Shopify;
@@ -224,6 +225,336 @@ codeunit 139647 "Shpfy Company Import Test"
         LibraryAssert.AreEqual(TaxRegistrationId, Customer."VAT Registration No.", 'VAT Registration No.');
     end;
 
+    [Test]
+    procedure UnitTestCompanyCustomerUsesExplicitTemplateBeforeConfiguredTemplates()
+    var
+        Customer: Record Customer;
+        TestShop: Record "Shpfy Shop";
+        CountryTemplateCode: Code[20];
+        ExplicitTemplateCode: Code[20];
+        ShopCompanyTemplateCode: Code[20];
+        CountryPaymentTermsCode: Code[10];
+        ExplicitPaymentTermsCode: Code[10];
+        ShopCompanyPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] An explicit order template overrides all configured B2B and customer templates.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A template is created for the country row.
+        CountryTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, CountryPaymentTermsCode);
+        //[GIVEN] The country template row uses those template codes.
+        CreateShopifyCustomerTemplate('US', CountryTemplateCode, CountryTemplateCode);
+        //[GIVEN] A shop-level company template is configured.
+        ShopCompanyTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, ShopCompanyPaymentTermsCode);
+        //[GIVEN] The test shop is copied for this selection.
+        TestShop := Shop;
+        //[GIVEN] The test shop has a company template.
+        TestShop."Company Templ. Code" := ShopCompanyTemplateCode;
+        //[GIVEN] An explicit order template is configured.
+        ExplicitTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, ExplicitPaymentTermsCode);
+
+        //[WHEN] A B2B customer is created with the explicit template.
+        Customer := CreateCustomerFromCompany(TestShop, 'US', ExplicitTemplateCode);
+
+        //[THEN] The created customer uses the explicit template.
+        LibraryAssert.AreEqual(ExplicitPaymentTermsCode, Customer."Payment Terms Code", 'Explicit template should be selected.');
+    end;
+
+    [Test]
+    procedure UnitTestCompanyCustomerUsesIsoCompanyTemplateBeforeMappedCountryAndShopTemplates()
+    var
+        Customer: Record Customer;
+        CountryRegion: Record "Country/Region";
+        TestShop: Record "Shpfy Shop";
+        IsoTemplateCode: Code[20];
+        MappedTemplateCode: Code[20];
+        ShopTemplateCode: Code[20];
+        IsoPaymentTermsCode: Code[10];
+        MappedPaymentTermsCode: Code[10];
+        ShopPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] The Shopify ISO country company template takes precedence over the mapped country and shop templates.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A Shopify ISO code is mapped to a different Business Central country code.
+        CreateCountryRegionMapping(CountryRegion, 'QZ');
+        //[GIVEN] A company template is created for the Shopify ISO country.
+        IsoTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, IsoPaymentTermsCode);
+        //[GIVEN] A distinct company template is created for the mapped country.
+        MappedTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, MappedPaymentTermsCode);
+        //[GIVEN] The ISO row is configured with its company template.
+        CreateShopifyCustomerTemplate('QZ', '', IsoTemplateCode);
+        //[GIVEN] The mapped-country row is configured with its company template.
+        CreateShopifyCustomerTemplate(CountryRegion.Code, '', MappedTemplateCode);
+        //[GIVEN] A shop-level company template is created.
+        ShopTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, ShopPaymentTermsCode);
+        //[GIVEN] The test shop is copied for this selection.
+        TestShop := Shop;
+        //[GIVEN] The test shop has its own company template.
+        TestShop."Company Templ. Code" := ShopTemplateCode;
+
+        //[WHEN] A B2B customer is created from the Shopify ISO country.
+        Customer := CreateCustomerFromCompany(TestShop, 'QZ', '');
+
+        //[THEN] The ISO-country company template is applied.
+        LibraryAssert.AreEqual(IsoPaymentTermsCode, Customer."Payment Terms Code", 'The ISO-country template should win.');
+    end;
+
+    [Test]
+    procedure UnitTestCompanyCustomerUsesMappedCountryTemplateWhenIsoTemplateIsBlank()
+    var
+        Customer: Record Customer;
+        CountryRegion: Record "Country/Region";
+        TestShop: Record "Shpfy Shop";
+        MappedTemplateCode: Code[20];
+        ShopTemplateCode: Code[20];
+        MappedPaymentTermsCode: Code[10];
+        ShopPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] The mapped country company template is used when the Shopify ISO row has no company template.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A Shopify ISO code is mapped to a different Business Central country code.
+        CreateCountryRegionMapping(CountryRegion, 'QY');
+        //[GIVEN] The ISO country row has no company template.
+        CreateShopifyCustomerTemplate('QY', '', '');
+        //[GIVEN] A company template is created for the mapped country.
+        MappedTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, MappedPaymentTermsCode);
+        //[GIVEN] The mapped-country row is configured with its company template.
+        CreateShopifyCustomerTemplate(CountryRegion.Code, '', MappedTemplateCode);
+        //[GIVEN] A shop-level company template is created.
+        ShopTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, ShopPaymentTermsCode);
+        //[GIVEN] The test shop is copied for this selection.
+        TestShop := Shop;
+        //[GIVEN] The test shop has its own company template.
+        TestShop."Company Templ. Code" := ShopTemplateCode;
+
+        //[WHEN] A B2B customer is created from the Shopify ISO country.
+        Customer := CreateCustomerFromCompany(TestShop, 'QY', '');
+
+        //[THEN] The mapped-country company template is applied.
+        LibraryAssert.AreEqual(MappedPaymentTermsCode, Customer."Payment Terms Code", 'The mapped-country template should be selected.');
+    end;
+
+    [Test]
+    procedure UnitTestCompanyCustomerUsesShopCompanyTemplateBeforeCountryCustomerTemplate()
+    var
+        Customer: Record Customer;
+        TestShop: Record "Shpfy Shop";
+        CountryTemplateCode: Code[20];
+        ShopTemplateCode: Code[20];
+        CountryPaymentTermsCode: Code[10];
+        ShopPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] The shop company template takes precedence over a country customer template.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A country customer template is configured.
+        CountryTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, CountryPaymentTermsCode);
+        //[GIVEN] The country row is configured with its customer template.
+        CreateShopifyCustomerTemplate('US', CountryTemplateCode, '');
+        //[GIVEN] A shop company template is created.
+        ShopTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, ShopPaymentTermsCode);
+        //[GIVEN] The test shop is copied for this selection.
+        TestShop := Shop;
+        //[GIVEN] The test shop has its own company template.
+        TestShop."Company Templ. Code" := ShopTemplateCode;
+
+        //[WHEN] A B2B customer is created from the country.
+        Customer := CreateCustomerFromCompany(TestShop, 'US', '');
+
+        //[THEN] The shop company template is applied.
+        LibraryAssert.AreEqual(ShopPaymentTermsCode, Customer."Payment Terms Code", 'The shop company template should win.');
+    end;
+
+    [Test]
+    procedure UnitTestCompanyCustomerUsesCountryCustomerTemplateBeforeShopCustomerTemplate()
+    var
+        Customer: Record Customer;
+        TestShop: Record "Shpfy Shop";
+        CountryTemplateCode: Code[20];
+        CountryPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] The country customer template is used before the shop customer template when no company template is configured.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A country customer template is configured.
+        CountryTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, CountryPaymentTermsCode);
+        //[GIVEN] The country row is configured with its customer template.
+        CreateShopifyCustomerTemplate('US', CountryTemplateCode, '');
+        //[GIVEN] No company-specific template is configured.
+        TestShop := Shop;
+        //[GIVEN] The test shop company template is blank.
+        TestShop."Company Templ. Code" := '';
+
+        //[WHEN] A B2B customer is created from the country.
+        Customer := CreateCustomerFromCompany(TestShop, 'US', '');
+
+        //[THEN] The country customer template is applied.
+        LibraryAssert.AreEqual(CountryPaymentTermsCode, Customer."Payment Terms Code", 'The country customer template should be selected.');
+    end;
+
+    [Test]
+    procedure UnitTestCompanyCustomerUsesShopCustomerTemplateWhenCountryTemplateIsNotConfigured()
+    var
+        Customer: Record Customer;
+        TestShop: Record "Shpfy Shop";
+        CustomerTemplateCode: Code[20];
+        PaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] The shop customer template is used when no country or company template is configured.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A shop customer template is created.
+        CustomerTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, PaymentTermsCode);
+        //[GIVEN] The test shop is copied for this selection.
+        TestShop := Shop;
+        //[GIVEN] The test shop company template is blank.
+        TestShop."Company Templ. Code" := '';
+        //[GIVEN] The test shop customer template is configured.
+        TestShop."Customer Templ. Code" := CustomerTemplateCode;
+
+        //[WHEN] A B2B customer is created without a country template.
+        Customer := CreateCustomerFromCompany(TestShop, 'QX', '');
+
+        //[THEN] The shop customer template is applied.
+        LibraryAssert.AreEqual(PaymentTermsCode, Customer."Payment Terms Code", 'The shop customer template should be selected.');
+    end;
+
+    [Test]
+    procedure UnitTestCompanyCustomerUsesMappedCountryCustomerTemplateWhenIsoTemplateIsBlank()
+    var
+        Customer: Record Customer;
+        CountryRegion: Record "Country/Region";
+        ShopifyCustomerTemplate: Record "Shpfy Customer Template";
+        TestShop: Record "Shpfy Shop";
+        MappedTemplateCode: Code[20];
+        MappedPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] A blank Shopify ISO customer template falls back to the mapped BC country customer template.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A Shopify ISO code is mapped to a different Business Central country code.
+        CreateCountryRegionMapping(CountryRegion, 'QW');
+        //[GIVEN] The Shopify ISO row has no customer template.
+        CreateShopifyCustomerTemplate('QW', '', '');
+        //[GIVEN] A customer template is created for the mapped country.
+        MappedTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, MappedPaymentTermsCode);
+        //[GIVEN] The mapped-country row is configured with that customer template.
+        CreateShopifyCustomerTemplate(CountryRegion.Code, MappedTemplateCode, '');
+        //[GIVEN] The test shop is copied for this selection.
+        TestShop := Shop;
+        //[GIVEN] The test shop has no company template that could take precedence.
+        TestShop."Company Templ. Code" := '';
+        //[GIVEN] The Shopify ISO row is retrieved.
+        ShopifyCustomerTemplate.Get(Shop.Code, 'QW');
+        //[GIVEN] The Shopify ISO row has no customer template.
+        LibraryAssert.AreEqual('', ShopifyCustomerTemplate."Customer Templ. Code", 'The Shopify ISO row should have no customer template.');
+
+        //[WHEN] A B2B customer is created from the Shopify ISO country.
+        Customer := CreateCustomerFromCompany(TestShop, 'QW', '');
+
+        //[THEN] The mapped BC country customer template is applied.
+        LibraryAssert.AreEqual(MappedPaymentTermsCode, Customer."Payment Terms Code", 'The mapped-country customer template should be selected.');
+    end;
+
+    [Test]
+    procedure UnitTestCompanyTemplateFieldsDefaultBlank()
+    var
+        ShopifyCustomerTemplate: Record "Shpfy Customer Template";
+    begin
+        //[SCENARIO] New shops and country-template rows have no company template configured by default.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A new country-template row is created without setting its company template.
+        CreateShopifyCustomerTemplate('QV', '', '');
+
+        //[WHEN] The new country-template row is retrieved.
+        ShopifyCustomerTemplate.Get(Shop.Code, 'QV');
+
+        //[THEN] The new shop company template is blank.
+        LibraryAssert.AreEqual('', Shop."Company Templ. Code", 'A new shop should have no company template by default.');
+        //[THEN] The new country-template company template is blank.
+        LibraryAssert.AreEqual('', ShopifyCustomerTemplate."Company Templ. Code", 'A new country-template row should have no company template by default.');
+    end;
+
+    [Test]
+    [HandlerFunctions('SyncCountriesHttpHandler')]
+    procedure UnitTestSyncCountriesPreservesCountryTemplateCodes()
+    var
+        ShopifyCustomerTemplate: Record "Shpfy Customer Template";
+        SyncCountries: Codeunit "Shpfy Sync Countries";
+        CustomerTemplateCode: Code[20];
+        CompanyTemplateCode: Code[20];
+        CustomerPaymentTermsCode: Code[10];
+        CompanyPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] Synchronizing Shopify countries preserves existing customer and company template codes.
+
+        //[GIVEN] Random test data uses a stable seed.
+        //[GIVEN] The shop and posting setup are created.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] The initialized shop setup is committed.
+        Initialize();
+
+        //[GIVEN] A customer template is created for the US country row.
+        CustomerTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, CustomerPaymentTermsCode);
+        //[GIVEN] A distinct company template is created for the US country row.
+        CompanyTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, CompanyPaymentTermsCode);
+        //[GIVEN] The US country row is configured with both template codes.
+        CreateShopifyCustomerTemplate('US', CustomerTemplateCode, CompanyTemplateCode);
+
+        //[WHEN] The shop's country synchronization runs.
+        SyncCountries.Run(Shop);
+
+        //[THEN] The existing country-template row can still be found.
+        ShopifyCustomerTemplate.Get(Shop.Code, 'US');
+        //[THEN] The customer template code is preserved.
+        LibraryAssert.AreEqual(CustomerTemplateCode, ShopifyCustomerTemplate."Customer Templ. Code", 'Country synchronization should preserve the customer template.');
+        //[THEN] The company template code is preserved.
+        LibraryAssert.AreEqual(CompanyTemplateCode, ShopifyCustomerTemplate."Company Templ. Code", 'Country synchronization should preserve the company template.');
+    end;
+
     local procedure Initialize()
     var
         AccessToken: SecretText;
@@ -232,10 +563,46 @@ codeunit 139647 "Shpfy Company Import Test"
         if IsInitialized then
             exit;
         IsInitialized := true;
+        InitializeTest.EnsureCustomerNoSeries();
         Shop := InitializeTest.CreateShop();
         AccessToken := Any.AlphanumericText(20);
         InitializeTest.RegisterAccessTokenForShop(Shop.GetStoreName(), AccessToken);
         Commit();
+    end;
+
+    local procedure CreateCountryRegionMapping(var CountryRegion: Record "Country/Region"; ISOCode: Code[2])
+    begin
+        CountryRegion.Code := LibraryERM.CreateCountryRegion();
+        CountryRegion.Get(CountryRegion.Code);
+        CountryRegion."ISO Code" := ISOCode;
+        CountryRegion.Modify(false);
+    end;
+
+    local procedure CreateShopifyCustomerTemplate(CountryCode: Code[20]; CustomerTemplateCode: Code[20]; CompanyTemplateCode: Code[20])
+    begin
+        InitializeTest.SetShopifyCustomerTemplate(Shop.Code, CountryCode, CustomerTemplateCode, CompanyTemplateCode);
+    end;
+
+    local procedure CreateCustomerFromCompany(ShopifyShop: Record "Shpfy Shop"; ShopifyCountryCode: Code[2]; ExplicitTemplateCode: Code[20]) Customer: Record Customer
+    var
+        TempShopifyCustomer: Record "Shpfy Customer" temporary;
+        ShopifyCompany: Record "Shpfy Company";
+        CompanyLocation: Record "Shpfy Company Location";
+        CreateCustomer: Codeunit "Shpfy Create Customer";
+        EmptyGuid: Guid;
+    begin
+        InitializeTest.EnsureCountryRegion(ShopifyCountryCode);
+        CreateCompany(ShopifyCompany, EmptyGuid);
+        CreateCompanyLocation(CompanyLocation, ShopifyCompany, 0);
+        CompanyLocation."Country/Region Code" := ShopifyCountryCode;
+        CompanyLocation.Modify(false);
+        CreateTempShopifyCustomer(TempShopifyCustomer);
+
+        CreateCustomer.SetShop(ShopifyShop);
+        if ExplicitTemplateCode <> '' then
+            CreateCustomer.SetTemplateCode(ExplicitTemplateCode);
+        CreateCustomer.CreateCustomerFromCompany(ShopifyCompany, TempShopifyCustomer);
+        Customer.GetBySystemId(ShopifyCompany."Customer SystemId");
     end;
 
     local procedure CreatePaymentTerms(): Code[10]
@@ -367,7 +734,6 @@ codeunit 139647 "Shpfy Company Import Test"
     begin
         if not InitializeTest.VerifyRequestUrl(Request.Path, Shop."Shopify URL") then
             exit(true);
-
         if OutboundHttpRequests.Length() = 0 then
             exit(true);
 
@@ -388,5 +754,17 @@ codeunit 139647 "Shpfy Company Import Test"
         end;
 
         exit(true);
+    end;
+
+    [HttpClientHandler]
+    internal procedure SyncCountriesHttpHandler(Request: TestHttpRequestMessage; var Response: TestHttpResponseMessage): Boolean
+    var
+        CountriesResponseLbl: Label '{"data":{"shop":{"shipsToCountries":["US"]}}}', Locked = true;
+    begin
+        if not InitializeTest.VerifyRequestUrl(Request.Path, Shop."Shopify URL") then
+            exit(true);
+
+        Response.Content.WriteFrom(CountriesResponseLbl);
+        exit(false);
     end;
 }
