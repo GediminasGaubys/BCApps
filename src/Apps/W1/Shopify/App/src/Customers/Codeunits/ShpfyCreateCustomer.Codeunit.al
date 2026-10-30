@@ -117,22 +117,26 @@ codeunit 30110 "Shpfy Create Customer"
     begin
         CustomerEvents.OnBeforeFindCustomerTemplate(ShopifyShop, CountryCode, Result, IsHandled);
         if not IsHandled then begin
-            Result := GetCountryTemplateCode(ShopifyShop.Code, ShopifyCountryCode, true);
-            if (Result = '') and (ShopifyCountryCode <> CountryCode) then
-                Result := GetCountryTemplateCode(ShopifyShop.Code, CountryCode, true);
-            if Result = '' then
-                Result := ShopifyShop."Company Templ. Code";
-            if Result = '' then begin
-                Result := GetCountryTemplateCode(ShopifyShop.Code, ShopifyCountryCode, false);
+            CustomerEvents.OnBeforeFindCompanyCustomerTemplate(ShopifyShop, CountryCode, ShopifyCountryCode, Result, IsHandled);
+            if not IsHandled then begin
+                Result := GetCountryTemplateCode(ShopifyShop.Code, ShopifyCountryCode, true);
                 if (Result = '') and (ShopifyCountryCode <> CountryCode) then
-                    Result := GetCountryTemplateCode(ShopifyShop.Code, CountryCode, false);
-            end;
-            if Result = '' then begin
-                ShopifyShop.TestField("Customer Templ. Code");
-                Result := ShopifyShop."Customer Templ. Code";
+                    Result := GetCountryTemplateCode(ShopifyShop.Code, CountryCode, true);
+                if Result = '' then
+                    Result := ShopifyShop."Company Templ. Code";
+                if Result = '' then begin
+                    Result := GetCountryTemplateCode(ShopifyShop.Code, ShopifyCountryCode, false);
+                    if (Result = '') and (ShopifyCountryCode <> CountryCode) then
+                        Result := GetCountryTemplateCode(ShopifyShop.Code, CountryCode, false);
+                end;
+                if Result = '' then begin
+                    ShopifyShop.TestField("Customer Templ. Code");
+                    Result := ShopifyShop."Customer Templ. Code";
+                end;
             end;
         end;
         CustomerEvents.OnAfterFindCustomerTemplate(ShopifyShop, CountryCode, Result);
+        CustomerEvents.OnAfterFindCompanyCustomerTemplate(ShopifyShop, CountryCode, ShopifyCountryCode, Result);
         exit(Result);
     end;
 
@@ -165,7 +169,7 @@ codeunit 30110 "Shpfy Create Customer"
         ICounty: Interface "Shpfy ICounty";
         ITaxRegistrationIdMapping: Interface "Shpfy Tax Registration Id Mapping";
         CountryCode: Code[20];
-        ShopifyCountryCode: Code[2];
+        ShopifyCountryCode: Code[20];
         CurrentTemplateCode: Code[20];
         IsHandled: Boolean;
     begin
