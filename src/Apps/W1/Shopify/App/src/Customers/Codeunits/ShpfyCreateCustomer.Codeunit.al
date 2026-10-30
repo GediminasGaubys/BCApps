@@ -111,6 +111,47 @@ codeunit 30110 "Shpfy Create Customer"
         exit(Result);
     end;
 
+    local procedure FindCompanyCustomerTemplate(ShopifyShop: Record "Shpfy Shop"; CountryCode: Code[20]; ShopifyCountryCode: Code[20]) Result: Code[20]
+    var
+        IsHandled: Boolean;
+    begin
+        CustomerEvents.OnBeforeFindCustomerTemplate(ShopifyShop, CountryCode, Result, IsHandled);
+        if not IsHandled then begin
+            Result := GetCountryTemplateCode(ShopifyShop.Code, ShopifyCountryCode, true);
+            if (Result = '') and (ShopifyCountryCode <> CountryCode) then
+                Result := GetCountryTemplateCode(ShopifyShop.Code, CountryCode, true);
+            if Result = '' then
+                Result := ShopifyShop."Company Templ. Code";
+            if Result = '' then begin
+                Result := GetCountryTemplateCode(ShopifyShop.Code, ShopifyCountryCode, false);
+                if (Result = '') and (ShopifyCountryCode <> CountryCode) then
+                    Result := GetCountryTemplateCode(ShopifyShop.Code, CountryCode, false);
+            end;
+            if Result = '' then begin
+                ShopifyShop.TestField("Customer Templ. Code");
+                Result := ShopifyShop."Customer Templ. Code";
+            end;
+        end;
+        CustomerEvents.OnAfterFindCustomerTemplate(ShopifyShop, CountryCode, Result);
+        exit(Result);
+    end;
+
+    local procedure GetCountryTemplateCode(ShopCode: Code[20]; CountryCode: Code[20]; IsCompanyTemplate: Boolean) Result: Code[20]
+    var
+        CustomerTemplate: Record "Shpfy Customer Template";
+    begin
+        if CountryCode = '' then
+            exit('');
+
+        if CustomerTemplate.Get(ShopCode, CountryCode) then
+            if IsCompanyTemplate then
+                Result := CustomerTemplate."Company Templ. Code"
+            else
+                Result := CustomerTemplate."Customer Templ. Code";
+
+        exit(Result);
+    end;
+
     internal procedure CreateCustomerFromCompany(var ShopifyCompany: Record "Shpfy Company"; TempShopifyCustomer: Record "Shpfy Customer" temporary)
     var
         Customer: Record Customer;
@@ -124,6 +165,7 @@ codeunit 30110 "Shpfy Create Customer"
         ICounty: Interface "Shpfy ICounty";
         ITaxRegistrationIdMapping: Interface "Shpfy Tax Registration Id Mapping";
         CountryCode: Code[20];
+        ShopifyCountryCode: Code[2];
         CurrentTemplateCode: Code[20];
         IsHandled: Boolean;
     begin
@@ -133,14 +175,16 @@ codeunit 30110 "Shpfy Create Customer"
             Error(NoLocationErr, ShopifyCompany.Id);
         end;
 
-        CountryRegion.SetRange("ISO Code", CompanyLocation."Country/Region Code");
-        if CountryRegion.FindFirst() then
-            CountryCode := CountryRegion.Code
-        else
-            CountryCode := CompanyLocation."Country/Region Code";
+        ShopifyCountryCode := CompanyLocation."Country/Region Code";
+        CountryCode := ShopifyCountryCode;
+        if ShopifyCountryCode <> '' then begin
+            CountryRegion.SetRange("ISO Code", ShopifyCountryCode);
+            if CountryRegion.FindFirst() then
+                CountryCode := CountryRegion.Code;
+        end;
 
         if TemplateCode = '' then
-            CurrentTemplateCode := FindCustomerTemplate(Shop, CountryCode)
+            CurrentTemplateCode := FindCompanyCustomerTemplate(Shop, CountryCode, ShopifyCountryCode)
         else
             CurrentTemplateCode := TemplateCode;
 

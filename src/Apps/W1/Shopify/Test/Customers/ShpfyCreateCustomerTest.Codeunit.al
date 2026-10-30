@@ -129,6 +129,119 @@ codeunit 139565 "Shpfy Create Customer Test"
         LibraryAssert.AreEqual(ShopifyCustomerAddress."Address 1", Customer.Address, 'Customer address should be updated from the available address.');
     end;
 
+    [Test]
+    procedure UnitTestB2CCustomerCreationUsesExplicitTemplateBeforeCountryAndShopTemplates()
+    var
+        Customer: Record Customer;
+        TestShop: Record "Shpfy Shop";
+        CountryTemplateCode: Code[20];
+        ExplicitTemplateCode: Code[20];
+        CountryPaymentTermsCode: Code[10];
+        ExplicitPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] An explicit customer template overrides country and shop customer templates.
+
+        //[GIVEN] The shop is created and configured for customer names.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] Duplicate-contact search is disabled.
+        //[GIVEN] Initialized customer setup is committed.
+        Initialize();
+
+        //[GIVEN] A country customer template is configured.
+        CountryTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, CountryPaymentTermsCode);
+        //[GIVEN] The country row is configured with its customer template.
+        CreateShopifyCustomerTemplate('US', CountryTemplateCode);
+        //[GIVEN] An explicit customer template is configured.
+        ExplicitTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, ExplicitPaymentTermsCode);
+        //[GIVEN] The shop is copied for this selection.
+        TestShop := Shop;
+
+        //[WHEN] A B2C customer is created with the explicit template.
+        Customer := CreateCustomerFromShopifyAddress(TestShop, ExplicitTemplateCode);
+
+        //[THEN] The created customer uses the explicit template.
+        LibraryAssert.AreEqual(ExplicitPaymentTermsCode, Customer."Payment Terms Code", 'Explicit template should be selected.');
+    end;
+
+    [Test]
+    procedure UnitTestB2CCustomerCreationUsesCountryTemplateBeforeShopTemplate()
+    var
+        Customer: Record Customer;
+        TestShop: Record "Shpfy Shop";
+        CountryTemplateCode: Code[20];
+        CountryPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] The country customer template takes precedence over the shop customer template.
+
+        //[GIVEN] The shop is created and configured for customer names.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] Duplicate-contact search is disabled.
+        //[GIVEN] Initialized customer setup is committed.
+        Initialize();
+
+        //[GIVEN] A country customer template is configured.
+        CountryTemplateCode := InitializeTest.CreateCustomerTemplate(Shop, CountryPaymentTermsCode);
+        //[GIVEN] The country row is configured with its customer template.
+        CreateShopifyCustomerTemplate('US', CountryTemplateCode);
+        //[GIVEN] The shop customer template remains configured as a fallback.
+        TestShop := Shop;
+
+        //[WHEN] A B2C customer is created without an explicit template.
+        Customer := CreateCustomerFromShopifyAddress(TestShop, '');
+
+        //[THEN] The country customer template is applied.
+        LibraryAssert.AreEqual(CountryPaymentTermsCode, Customer."Payment Terms Code", 'The country customer template should be selected.');
+    end;
+
+    [Test]
+    procedure UnitTestB2CCustomerCreationUsesShopTemplateWhenCountryTemplateIsNotConfigured()
+    var
+        Customer: Record Customer;
+        TestShop: Record "Shpfy Shop";
+        ShopPaymentTermsCode: Code[10];
+    begin
+        //[SCENARIO] The shop customer template is used when no country customer template is configured.
+
+        //[GIVEN] The shop is created and configured for customer names.
+        //[GIVEN] An access token is registered for the shop.
+        //[GIVEN] Duplicate-contact search is disabled.
+        //[GIVEN] Initialized customer setup is committed.
+        Initialize();
+
+        //[GIVEN] The US country customer template is not configured.
+        CreateShopifyCustomerTemplate('US', '');
+
+        //[GIVEN] The test shop is copied with its customer template.
+        TestShop := Shop;
+        //[GIVEN] The shop customer template code is set.
+        TestShop."Customer Templ. Code" := InitializeTest.CreateCustomerTemplate(Shop, ShopPaymentTermsCode);
+
+        //[WHEN] A B2C customer is created without an explicit template.
+        Customer := CreateCustomerFromShopifyAddress(TestShop, '');
+
+        //[THEN] The shop customer template is applied.
+        LibraryAssert.AreEqual(ShopPaymentTermsCode, Customer."Payment Terms Code", 'The shop customer template should be selected.');
+    end;
+
+    local procedure CreateShopifyCustomerTemplate(CountryCode: Code[20]; CustomerTemplateCode: Code[20])
+    begin
+        InitializeTest.SetShopifyCustomerTemplate(Shop.Code, CountryCode, CustomerTemplateCode, '');
+    end;
+
+    local procedure CreateCustomerFromShopifyAddress(ShopifyShop: Record "Shpfy Shop"; ExplicitTemplateCode: Code[20]) Customer: Record Customer
+    var
+        ShopifyCustomerAddress: Record "Shpfy Customer Address";
+        CreateCustomer: Codeunit "Shpfy Create Customer";
+    begin
+        InitializeTest.EnsureCountryRegion('US');
+        ShopifyCustomerAddress := CustomerInitTest.CreateShopifyCustomerAddress();
+        CreateCustomer.SetShop(ShopifyShop);
+        if ExplicitTemplateCode <> '' then
+            CreateCustomer.SetTemplateCode(ExplicitTemplateCode);
+        CreateCustomer.Run(ShopifyCustomerAddress);
+        Customer.GetBySystemId(ShopifyCustomerAddress.CustomerSystemId);
+    end;
+
     local procedure Initialize()
     var
         MarketingSetup: Record "Marketing Setup";
@@ -137,6 +250,7 @@ codeunit 139565 "Shpfy Create Customer Test"
         if IsInitialized then
             exit;
         IsInitialized := true;
+        InitializeTest.EnsureCustomerNoSeries();
         Shop := InitializeTest.CreateShop();
         Shop."Name Source" := "Shpfy Name Source"::CompanyName;
         Shop."Name 2 Source" := "Shpfy Name Source"::FirstAndLastName;
