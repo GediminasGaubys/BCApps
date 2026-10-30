@@ -1143,9 +1143,9 @@ page 30113 "Shpfy Order"
         OrderCancelledMsg: Label 'Order has been cancelled successfully.';
         OrderCancelFailedErr: Label 'Specifies the order could not be cancelled. You can see the error message from Shopify Log Entries.';
         LogEntriesLbl: Label 'Log Entries';
+        ErrorMessageStyleTxt: Text;
         WorkDescription: Text;
         PresentmentVisible: Boolean;
-        ErrorMessageStyleTxt: Text;
 
     trigger OnAfterGetRecord()
     begin

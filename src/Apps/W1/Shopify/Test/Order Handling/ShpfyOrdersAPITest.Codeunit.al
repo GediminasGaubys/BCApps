@@ -330,8 +330,8 @@ codeunit 139608 "Shpfy Orders API Test"
     procedure Completeness_AllApplicableGapsAndFallback()
     var
         TempCases: Record "Shpfy Order Header" temporary;
-        ExpectedIssues: Dictionary of [BigInteger, Text];
         ActualIssues: Dictionary of [BigInteger, Text];
+        ExpectedIssues: Dictionary of [BigInteger, Text];
         MappingResults: Dictionary of [BigInteger, Boolean];
     begin
         // [SCENARIO] Mapping collects every unresolved customer, item and required account gap after applying existing fallback rules.
@@ -375,8 +375,8 @@ codeunit 139608 "Shpfy Orders API Test"
     [TransactionModel(TransactionModel::AutoCommit)]
     procedure Completeness_AutomaticUpdateFailurePersistsMappingError()
     var
-        ImportOrder: JsonObject;
         ImportLines: JsonArray;
+        ImportOrder: JsonObject;
         OrderId: BigInteger;
     begin
         // [SCENARIO] Importing an existing order as Update persists all unresolved mapping details even when automatic document creation is enabled.
@@ -398,8 +398,8 @@ codeunit 139608 "Shpfy Orders API Test"
     [TransactionModel(TransactionModel::AutoCommit)]
     procedure Completeness_AutomaticUpdateRecoveryClearsMappingError()
     var
-        ImportOrder: JsonObject;
         ImportLines: JsonArray;
+        ImportOrder: JsonObject;
         OrderId: BigInteger;
     begin
         // [SCENARIO] A successful automatic Update removes only the mapping-owned diagnostic left by a previous incomplete import.
@@ -422,10 +422,10 @@ codeunit 139608 "Shpfy Orders API Test"
     [TransactionModel(TransactionModel::AutoCommit)]
     procedure Completeness_AutomaticUpdatePreservesOrderStateError()
     var
-        ImportOrder: JsonObject;
         ImportLines: JsonArray;
-        OrderId: BigInteger;
+        ImportOrder: JsonObject;
         MappingConflictLbl: Label 'Processed-order conflict. Preserve the entire original diagnostic.';
+        OrderId: BigInteger;
     begin
         // [SCENARIO] Updating an already processed order with incomplete mappings must not replace an active order-state conflict.
         // Both error flags and the original conflict message remain unchanged, and no sales order or invoice number is assigned.
@@ -447,10 +447,10 @@ codeunit 139608 "Shpfy Orders API Test"
     procedure Completeness_RetryAfterMappingCorrection()
     var
         JobQueueEntry: Record "Job Queue Entry";
-        Outcomes: JsonArray;
-        OrderId: BigInteger;
-        ImportOrder: JsonObject;
         ImportLines: JsonArray;
+        ImportOrder: JsonObject;
+        OrderId: BigInteger;
+        Outcomes: JsonArray;
     begin
         // [SCENARIO] Repeated scheduled, manual and batch attempts remain retryable while mappings are incomplete.
         // Each failure leaves the order unprocessed without a document; correcting the mappings allows one document to be created.
@@ -500,7 +500,6 @@ codeunit 139608 "Shpfy Orders API Test"
         // [THEN] Sales document is created from Shopify order
         SalesHeader.SetRange("Shpfy Order Id", OrderHeader."Shopify Order Id");
         LibraryAssert.IsTrue(SalesHeader.FindLast(), 'Sales document is created from Shopify order');
-
         case SalesHeader."Document Type" of
             "Sales Document Type"::Order:
                 // [THEN] ShShpfyOrderHeader."Sales Order No." = SalesHeader."No."
@@ -546,7 +545,6 @@ codeunit 139608 "Shpfy Orders API Test"
         // [THEN] Sales document is created from Shopify order
         SalesHeader.SetRange("Shpfy Order Id", OrderHeader."Shopify Order Id");
         LibraryAssert.IsTrue(SalesHeader.FindLast(), 'Sales document is created from Shopify order');
-
         case SalesHeader."Document Type" of
             "Sales Document Type"::Order:
                 // [THEN] ShShpfyOrderHeader."Sales Order No." = SalesHeader."No."
@@ -1910,18 +1908,18 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure PrepareCompletenessCases(var TempCases: Record "Shpfy Order Header" temporary; var ExpectedIssues: Dictionary of [BigInteger, Text])
     var
+        Customer: Record Customer;
+        CustomerTemplate: Record "Shpfy Customer Template";
         OrderHeader: Record "Shpfy Order Header";
         OrderLine: Record "Shpfy Order Line";
-        CustomerTemplate: Record "Shpfy Customer Template";
-        Customer: Record Customer;
-        OrderId: BigInteger;
         Index: Integer;
         IssueText: Text;
-        MappingSellToTok: Label 'SellToCustomer', Locked = true;
         MappingBillToTok: Label 'BillToCustomer', Locked = true;
-        MappingTipTok: Label 'TipAccount', Locked = true;
         MappingGiftCardTok: Label 'GiftCardAccount', Locked = true;
         MappingItemTok: Label 'ItemLine:%1', Locked = true, Comment = '%1 = Shopify line id';
+        MappingSellToTok: Label 'SellToCustomer', Locked = true;
+        MappingTipTok: Label 'TipAccount', Locked = true;
+        OrderId: BigInteger;
     begin
         this.AddCompletenessCase(TempCases, ExpectedIssues, false, true, false, false);
 
@@ -1972,13 +1970,13 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure AddCompletenessCase(var TempCases: Record "Shpfy Order Header" temporary; var ExpectedIssues: Dictionary of [BigInteger, Text]; MissingSellTo: Boolean; MissingBillTo: Boolean; MissingTip: Boolean; MissingGiftCard: Boolean): BigInteger
     var
-        OrderHeader: Record "Shpfy Order Header";
         Customer: Record Customer;
+        OrderHeader: Record "Shpfy Order Header";
         IssueText: Text;
-        MappingSellToTok: Label 'SellToCustomer', Locked = true;
         MappingBillToTok: Label 'BillToCustomer', Locked = true;
-        MappingTipTok: Label 'TipAccount', Locked = true;
         MappingGiftCardTok: Label 'GiftCardAccount', Locked = true;
+        MappingSellToTok: Label 'SellToCustomer', Locked = true;
+        MappingTipTok: Label 'TipAccount', Locked = true;
     begin
         this.Shop := this.CreateIncompleteMappingShop();
         this.Shop.Code := CopyStr(this.Any.AlphabeticText(20), 1, MaxStrLen(this.Shop.Code));
@@ -1990,7 +1988,6 @@ codeunit 139608 "Shpfy Orders API Test"
         if not MissingBillTo then
             OrderHeader."Bill-to Customer No." := Customer."No.";
         OrderHeader.Modify(false);
-
         if MissingSellTo then
             IssueText += MappingSellToTok + '|';
         if MissingBillTo and MissingSellTo then
@@ -2015,9 +2012,9 @@ codeunit 139608 "Shpfy Orders API Test"
     var
         OrderHeader: Record "Shpfy Order Header";
         OrderMapping: Codeunit "Shpfy Order Mapping";
-        Issues: List of [Text];
         Actual: Text;
         Issue: Text;
+        Issues: List of [Text];
     begin
         if TempCases.FindSet() then
             repeat
@@ -2032,35 +2029,35 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure VerifyCompletenessCases(var TempCases: Record "Shpfy Order Header" temporary; ExpectedIssues: Dictionary of [BigInteger, Text]; ActualIssues: Dictionary of [BigInteger, Text]; MappingResults: Dictionary of [BigInteger, Boolean])
     var
-        OrderHeader: Record "Shpfy Order Header";
         CustomerTemplate: Record "Shpfy Customer Template";
+        OrderHeader: Record "Shpfy Order Header";
         OrderMapping: Codeunit "Shpfy Order Mapping";
-        Issues: List of [Text];
-        OrderId: BigInteger;
-        Expected: Text;
         Actual: Text;
-        RenderedError: Text;
+        Expected: Text;
         ExpectedItemIssue: Text;
-        ItemLineId: Text;
-        Issue: Text;
-        LongestResult: Integer;
-        ItemErrorPosition: Integer;
-        PreviousItemErrorPosition: Integer;
-        MappingErrorPosition: Integer;
         ExpectedStoredErrorBody: Text;
-        StoredErrorBody: Text;
-        MappingIssuesMismatchErr: Label 'Order %1 must retain every unresolved issue in discovery order.', Comment = '%1 = Shopify order id';
-        MappingResultMismatchErr: Label 'Order %1 mapping result must agree with its unresolved issues.', Comment = '%1 = Shopify order id';
-        MappingCustomerMismatchErr: Label 'Order %1 must retain the customer selected by the existing mapping rules.', Comment = '%1 = Shopify order id';
-        MappingCasesMismatchErr: Label 'Every prepared mapping case must be executed.';
-        MappingItemWordingErr: Label 'Item-line issues must be rendered with their Shopify line ID.';
-        MappingItemIssueLbl: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
+        Issue: Text;
+        Issues: List of [Text];
+        ItemErrorPosition: Integer;
+        ItemLineId: Text;
         ItemLineIssuePrefixTok: Label 'ItemLine:', Locked = true;
-        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
-        MappingItemTokenExposureErr: Label 'Internal item-line issue tokens must not be shown to the user.';
+        LongestResult: Integer;
+        MappingCasesMismatchErr: Label 'Every prepared mapping case must be executed.';
         MappingCollectionSizeErr: Label 'The collected issue list must exceed the existing error capacity without dropping later issues.';
-        MappingErrorLengthErr: Label 'The stored mapping error must be truncated to the field capacity.';
+        MappingCustomerMismatchErr: Label 'Order %1 must retain the customer selected by the existing mapping rules.', Comment = '%1 = Shopify order id';
         MappingErrorContentErr: Label 'The stored mapping error must retain the first 2048 characters, including a partial final issue.';
+        MappingErrorLengthErr: Label 'The stored mapping error must be truncated to the field capacity.';
+        MappingErrorPosition: Integer;
+        MappingIssuesMismatchErr: Label 'Order %1 must retain every unresolved issue in discovery order.', Comment = '%1 = Shopify order id';
+        MappingItemIssueLbl: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
+        MappingItemTokenExposureErr: Label 'Internal item-line issue tokens must not be shown to the user.';
+        MappingItemWordingErr: Label 'Item-line issues must be rendered with their Shopify line ID.';
+        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
+        MappingResultMismatchErr: Label 'Order %1 mapping result must agree with its unresolved issues.', Comment = '%1 = Shopify order id';
+        OrderId: BigInteger;
+        PreviousItemErrorPosition: Integer;
+        RenderedError: Text;
+        StoredErrorBody: Text;
     begin
         this.LibraryAssert.AreEqual(5, TempCases.Count(), MappingCasesMismatchErr);
         this.LibraryAssert.AreEqual(TempCases.Count(), ExpectedIssues.Count(), MappingCasesMismatchErr);
@@ -2145,16 +2142,16 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure ExerciseMappingEntryPaths(Cases: Dictionary of [Text, BigInteger]; var Outcomes: JsonArray)
     var
-        OrderHeader: Record "Shpfy Order Header";
         Customer: Record Customer;
+        OrderHeader: Record "Shpfy Order Header";
         CaseName: Text;
         ExpectedError: Text;
-        RemainingError: TextBuilder;
-        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
-        MappingItemMissingLbl: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
-        MappingTipDetailLbl: Label 'Tip Account must have a value in Shopify Shop.';
         MappingGiftCardDetailLbl: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
+        MappingItemMissingLbl: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
+        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
+        MappingTipDetailLbl: Label 'Tip Account must have a value in Shopify Shop.';
         MappingUnrelatedLbl: Label 'Unrelated active error. Not everything can be mapped. Preserve the entire original diagnostic.';
+        RemainingError: TextBuilder;
     begin
         foreach CaseName in Cases.Keys() do begin
             this.RunMappingPath(Cases.Get(CaseName), CaseName);
@@ -2176,7 +2173,6 @@ codeunit 139608 "Shpfy Orders API Test"
         RemainingError.AppendLine(MappingGiftCardDetailLbl);
         RemainingError.AppendLine(StrSubstNo(MappingItemMissingLbl, Format(OrderHeader."Shopify Order Id" * 10 + 5, 0, 9)));
         this.CaptureMappingOutcome(OrderHeader."Shopify Order Id", RemainingError.ToText(), true, false, false, 0, Outcomes);
-
         foreach CaseName in Cases.Keys() do begin
             this.CorrectMappingOrder(Cases.Get(CaseName));
             this.RunMappingPath(Cases.Get(CaseName), CaseName);
@@ -2214,8 +2210,8 @@ codeunit 139608 "Shpfy Orders API Test"
     local procedure PrepareAutomaticUpdateOrder(var ImportOrder: JsonObject; var ImportLines: JsonArray): BigInteger
     var
         OrdersToImport: Record "Shpfy Orders to Import";
-        OrderId: BigInteger;
         MappingStagedOrderErr: Label 'The incomplete order must be staged before its import action can be updated.';
+        OrderId: BigInteger;
     begin
         this.Shop := this.CreateIncompleteMappingShop();
         this.SetAutomaticOrderCreation(true);
@@ -2270,11 +2266,11 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure CorrectMappingOrder(OrderId: BigInteger)
     var
+        Customer: Record Customer;
+        Item: Record Item;
         OrderHeader: Record "Shpfy Order Header";
         OrderLine: Record "Shpfy Order Line";
         Variant: Record "Shpfy Variant";
-        Item: Record Item;
-        Customer: Record Customer;
     begin
         Customer := this.InitializeTest.GetDummyCustomer();
         OrderHeader.Get(OrderId);
@@ -2307,12 +2303,12 @@ codeunit 139608 "Shpfy Orders API Test"
     local procedure ExpectedMappingDetails(OrderId: BigInteger; IncludeAccounts: Boolean): Text
     var
         Builder: TextBuilder;
-        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
-        MappingTipDetailLbl: Label 'Tip Account must have a value in Shopify Shop.';
-        MappingGiftCardDetailLbl: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
-        MappingSellToDetailLbl: Label 'Sell-to Customer No. is missing.';
         MappingBillToDetailLbl: Label 'Bill-to Customer No. is missing.';
-        MappingItemMissingLbl: Label 'Item No. is missing on Shopify order line %1.';
+        MappingGiftCardDetailLbl: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
+        MappingItemMissingLbl: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
+        MappingPrefixTok: Label 'Not everything can be mapped.', Locked = true;
+        MappingSellToDetailLbl: Label 'Sell-to Customer No. is missing.';
+        MappingTipDetailLbl: Label 'Tip Account must have a value in Shopify Shop.';
     begin
         Builder.AppendLine(MappingPrefixTok);
         Builder.AppendLine(MappingSellToDetailLbl);
@@ -2339,10 +2335,10 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure CaptureMappingOutcome(OrderId: BigInteger; ExpectedError: Text; Timestamped: Boolean; ExpectedOrderStateError: Boolean; ExpectedProcessed: Boolean; ExpectedDocumentCount: Integer; var Outcomes: JsonArray)
     var
-        OrderHeader: Record "Shpfy Order Header";
-        SalesHeader: Record "Sales Header";
         DocumentLink: Record "Shpfy Doc. Link To Doc.";
+        OrderHeader: Record "Shpfy Order Header";
         OrdersToImport: Record "Shpfy Orders to Import";
+        SalesHeader: Record "Sales Header";
         Outcome: JsonObject;
     begin
         OrderHeader.SetLoadFields("Error Message", "Has Error", "Has Order State Error", Processed, "Sales Order No.", "Sales Invoice No.");
@@ -2371,21 +2367,21 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure VerifyMappingOutcomes(Outcomes: JsonArray; ExpectedCount: Integer)
     var
-        OutcomeToken: JsonToken;
-        Outcome: JsonObject;
-        ExpectedError: Text;
         ActualError: Text;
         ErrorMessage: Text;
         ErrorTime: Time;
-        MappingErrorFlagErr: Label 'The persisted error flag must match the execution outcome.';
-        MappingErrorMessageErr: Label 'Order %1 must retain the whole owned error. Expected: <%2>. Actual: <%3>.', Comment = '%1 = Shopify order id, %2 = expected error text, %3 = actual error text';
-        MappingTimestampErr: Label 'The mapping error must start with a session-formatted time.';
-        MappingProcessedErr: Label 'Only a successfully corrected order may be marked processed.';
+        ExpectedError: Text;
+        MappingConflictPreservationErr: Label 'An active processed-order conflict must retain its order-state error flag.';
         MappingDocumentCountErr: Label 'An incomplete order must have no sales document; a corrected order must have exactly one.';
         MappingDocumentLinkErr: Label 'Failed processing must not leave sales document numbers or document links.';
+        MappingErrorFlagErr: Label 'The persisted error flag must match the execution outcome.';
+        MappingErrorMessageErr: Label 'Order %1 must retain the whole owned error. Expected: <%2>. Actual: <%3>.', Comment = '%1 = Shopify order id, %2 = expected error text, %3 = actual error text';
         MappingOutcomeCountErr: Label 'Every execution path and recovery attempt must be observed.';
+        MappingProcessedErr: Label 'Only a successfully corrected order may be marked processed.';
         MappingRetryQueueErr: Label 'A successfully imported order must leave the staging queue even when mapping is incomplete.';
-        MappingConflictPreservationErr: Label 'An active processed-order conflict must retain its order-state error flag.';
+        MappingTimestampErr: Label 'The mapping error must start with a session-formatted time.';
+        Outcome: JsonObject;
+        OutcomeToken: JsonToken;
     begin
         this.HttpResponses.AssertEmpty();
         this.LibraryAssert.AreEqual(ExpectedCount, Outcomes.Count(), MappingOutcomeCountErr);
@@ -2427,9 +2423,9 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure PrepareMappingRetry(var JobQueueEntry: Record "Job Queue Entry"; var ImportOrder: JsonObject; var ImportLines: JsonArray): BigInteger
     var
-        OrderId: BigInteger;
         ShopFilter: Record "Shpfy Shop";
         MappingJobParametersTok: Label '<?xml version="1.0" standalone="yes"?><ReportParameters name="Sync Orders from Shopify" id="30104"><DataItems><DataItem name="Shop">%1</DataItem><DataItem name="OrdersToImport">VERSION(1) SORTING(Field1)</DataItem></DataItems></ReportParameters>', Locked = true, Comment = '%1 = Shop record view';
+        OrderId: BigInteger;
     begin
         this.Shop := this.CreateIncompleteMappingShop();
         this.SetAutomaticOrderCreation(true);
@@ -2458,7 +2454,6 @@ codeunit 139608 "Shpfy Orders API Test"
         Clear(JobQueueStartReport);
         JobQueueStartReport.Run(JobQueueEntry);
         this.CaptureMappingOutcome(OrderId, this.ExpectedMappingDetails(OrderId, true), true, false, false, 0, Outcomes);
-
         for Index := 1 to 2 do begin
             this.RunMappingPath(OrderId, 'Manual');
             this.CaptureMappingOutcome(OrderId, this.ExpectedProcessingMappingDetails(OrderId, true), true, false, false, 0, Outcomes);
@@ -2475,8 +2470,8 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure RestageMappingOrder(OrderId: BigInteger; ImportOrder: JsonObject; ImportLines: JsonArray)
     var
-        OrdersToImport: Record "Shpfy Orders to Import";
         OrderHeader: Record "Shpfy Order Header";
+        OrdersToImport: Record "Shpfy Orders to Import";
     begin
         OrderHeader.Get(OrderId);
         this.Shop.Get(OrderHeader."Shop Code");
@@ -2520,21 +2515,21 @@ codeunit 139608 "Shpfy Orders API Test"
         Item: Record Item;
         Product: Record "Shpfy Product";
         Variant: Record "Shpfy Variant";
-        OrdersAPI: Codeunit "Shpfy Orders API";
         OrderHandlingHelper: Codeunit "Shpfy Order Handling Helper";
-        OrdersResponse: JsonObject;
-        Node: JsonToken;
-        Customer: JsonObject;
-        ContactDetails: JsonObject;
+        OrdersAPI: Codeunit "Shpfy Orders API";
         Address: JsonObject;
-        PriceSet: JsonObject;
+        ContactDetails: JsonObject;
+        Cursor: Text;
+        Customer: JsonObject;
+        Line: JsonObject;
         Money: JsonObject;
+        Node: JsonToken;
+        OrdersResponse: JsonObject;
+        PriceSet: JsonObject;
+        ProductJson: JsonObject;
         TaxLine: JsonObject;
         TaxLines: JsonArray;
-        Line: JsonObject;
-        ProductJson: JsonObject;
         VariantJson: JsonObject;
-        Cursor: Text;
     begin
         OrdersResponse := OrderHandlingHelper.GetOrdersToImport(false);
         OrdersToImport.SetRange("Shop Id", this.Shop."Shop Id");
@@ -2620,15 +2615,15 @@ codeunit 139608 "Shpfy Orders API Test"
     var
         OrdersToImport: Record "Shpfy Orders to Import";
         RegisteredStore: Record "Shpfy Registered Store New";
+        Variant: Record "Shpfy Variant";
         AuthenticationMgt: Codeunit "Shpfy Authentication Mgt.";
-        JShopifyCustomer: JsonObject;
+        EntryNo: Integer;
         JDefaultEmailAddress: JsonObject;
         JDefaultPhoneNumber: JsonObject;
-        LineToken: JsonToken;
+        JShopifyCustomer: JsonObject;
         Line: JsonObject;
-        Variant: Record "Shpfy Variant";
         LineId: BigInteger;
-        EntryNo: Integer;
+        LineToken: JsonToken;
         UnmappedCustomerId: BigInteger;
         UnmappedEmail: Text;
         UnmappedPhone: Text;
@@ -2691,9 +2686,9 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure AddMappingAccountImportLines(OrderId: BigInteger; Line: JsonObject; var Lines: JsonArray)
     var
-        NullValue: JsonValue;
         EmptyLines: JsonArray;
         Money: JsonObject;
+        NullValue: JsonValue;
         PriceSet: JsonObject;
     begin
         Line := Line.Clone().AsObject();
@@ -2862,8 +2857,8 @@ codeunit 139608 "Shpfy Orders API Test"
 
     local procedure CreateUnmappedItemLine(OrderId: BigInteger; LineId: BigInteger; IsExchangeItem: Boolean)
     var
-        ShopifyVariant: Record "Shpfy Variant";
         OrderLine: Record "Shpfy Order Line";
+        ShopifyVariant: Record "Shpfy Variant";
     begin
         ShopifyVariant.Init();
         ShopifyVariant.Id := LineId;
@@ -2890,7 +2885,6 @@ codeunit 139608 "Shpfy Orders API Test"
         PlanRefreshExpected := false;
         PlanRefreshCallCount := 0;
         HttpResponses.Clear();
-
         if IsInitialized then
             exit;
 
@@ -2910,18 +2904,15 @@ codeunit 139608 "Shpfy Orders API Test"
     begin
         if not InitializeTest.VerifyRequestUrl(Request.Path, Shop."Shopify URL") then
             exit(true);
-
         if HttpResponses.Length() > 0 then begin
             Response.Content.WriteFrom(HttpResponses.DequeueText());
             exit(false);
         end;
-
         if PlanRefreshExpected and (PlanRefreshCallCount = 0) then begin
             PlanRefreshCallCount += 1;
             Response.Content.WriteFrom(DowngradedPlanShopResponseTok);
             exit(false);
         end;
-
         if CompanyLocationId <> 0 then begin
             Body := NavApp.GetResourceAsText('Order Handling/CompanyLocationResult.txt', TextEncoding::UTF8);
             Response.Content.WriteFrom(Body.Replace('{{LocationId}}', Format(CompanyLocationId)));
@@ -2979,13 +2970,11 @@ codeunit 139608 "Shpfy Orders API Test"
     begin
         JOrdersToImport.GetObject('data').GetObject('orders').GetArray('edges').Get(0, JOrder);
         JNode := JOrder.AsObject().GetObject('node');
-
         if JNode.Contains('taxLines') then
             JNode.Remove('taxLines');
 
         Clear(JTaxLine);
         Clear(JTaxLines);
-
         case ChannelLiableScenario of
             ChannelLiableScenario::Missing:
                 begin
@@ -3056,7 +3045,6 @@ codeunit 139608 "Shpfy Orders API Test"
         JPriceSet.Add('presentmentMoney', JPresentmentMoney);
 
         JTaxLine.Add('priceSet', JPriceSet);
-
         case ChannelLiableScenario of
             ChannelLiableScenario::TrueValue:
                 begin

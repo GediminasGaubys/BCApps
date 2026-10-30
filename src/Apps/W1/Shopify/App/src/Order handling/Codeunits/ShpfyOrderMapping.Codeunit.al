@@ -21,12 +21,12 @@ codeunit 30163 "Shpfy Order Mapping"
 
     var
         OrderEvents: Codeunit "Shpfy Order Events";
-        MappingErr: Label 'Not everything can be mapped.';
-        SellToCustomerIssueTok: Label 'SellToCustomer', Locked = true;
         BillToCustomerIssueTok: Label 'BillToCustomer', Locked = true;
-        TipAccountIssueTok: Label 'TipAccount', Locked = true;
         GiftCardAccountIssueTok: Label 'GiftCardAccount', Locked = true;
         ItemLineIssuePrefixTok: Label 'ItemLine:', Locked = true;
+        MappingErr: Label 'Not everything can be mapped.';
+        SellToCustomerIssueTok: Label 'SellToCustomer', Locked = true;
+        TipAccountIssueTok: Label 'TipAccount', Locked = true;
 
     /// <summary> 
     /// Description for DoMapping.
@@ -118,9 +118,9 @@ codeunit 30163 "Shpfy Order Mapping"
     local procedure LogMappingIssues(MissingIssues: List of [Text]; ExecutionMode: Text[20])
     var
         Categories: List of [Text];
-        Issue: Text;
         Category: Text;
         Dimensions: Dictionary of [Text, Text];
+        Issue: Text;
         MappingTelemetryMsg: Label 'Shopify order mapping is incomplete.', Locked = true;
     begin
         foreach Issue in MissingIssues do begin
@@ -140,14 +140,14 @@ codeunit 30163 "Shpfy Order Mapping"
 
     internal procedure GetMappingErrorMessage(MissingIssues: List of [Text]): Text
     var
-        ErrorBuilder: TextBuilder;
-        MissingIssue: Text;
-        ItemLineId: Text;
-        SellToCustomerMissingErr: Label 'Sell-to Customer No. is missing.';
         BillToCustomerMissingErr: Label 'Bill-to Customer No. is missing.';
-        TipAccountMissingErr: Label 'Tip Account must have a value in Shopify Shop.';
+        ErrorBuilder: TextBuilder;
         GiftCardAccountMissingErr: Label 'Sold Gift Card Account must have a value in Shopify Shop.';
+        ItemLineId: Text;
         ItemLineMissingErr: Label 'Item No. is missing on Shopify order line %1.', Comment = '%1 = Shopify order line ID';
+        MissingIssue: Text;
+        SellToCustomerMissingErr: Label 'Sell-to Customer No. is missing.';
+        TipAccountMissingErr: Label 'Tip Account must have a value in Shopify Shop.';
     begin
         ErrorBuilder.AppendLine(MappingErr);
         foreach MissingIssue in MissingIssues do
